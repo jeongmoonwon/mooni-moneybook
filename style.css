@@ -233,3 +233,4 @@ body.demo .demo-banner{display:block}
 .td-cmp{font-size:13px;color:var(--t2);margin:2px 0 12px}
 #view-trend{--series:var(--s1);--peak:var(--up)}
 .seg.seg-2{grid-template-columns:repeat(2,1fr)}
+.add-day{margin:6px 0 4px;padding:11px}

@@ -334,8 +334,18 @@ function renderCalendar() {
   const dd = parse(state.calDay), dayEx = ex.get(state.calDay) || 0;
   $('#cal-list').innerHTML = `<div class="day-head"><span>${dd.getMonth() + 1}월 ${dd.getDate()}일 (${WD[dd.getDay()]})</span>
     <span class="num">${dayEx ? '지출 ' + won(dayEx) : ''}</span></div>
+    <button class="btn ghost add-day" data-addday="${state.calDay}">＋ 이 날 내역 추가</button>
     <ul class="list">${dayList.length ? dayList.map(itemHtml).join('') : '<li class="empty">이 날은 기록이 없어요</li>'}</ul>
     ${dayList.filter(e => periodOf(e) !== state.period).map(e => `<p class="note">이 날 월급(${won(e.amount)})은 월급일 전에 일찍 들어와서 ${Number(periodOf(e).slice(5))}월 수입으로 계산돼요.</p>`).join('')}`;
+}
+
+// 달력에서 고른 날짜로 기록 탭을 연다
+function addOnDay(day) {
+  state.date = day;
+  go('add');
+  resetForm();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  toast(`${md(day).replace('.', '월 ')}일 기록을 입력해요`);
 }
 
 /* ================= 내역 탭 ================= */
@@ -697,6 +707,7 @@ document.addEventListener('click', ev => {
   if (d.shift) { state.date = addDays($('#f-date').value || today(), Number(d.shift)); return renderForm(); }
   if (d.pshift) { state.period = shiftPeriod(state.period, Number(d.pshift)); state.calDay = null; return refreshAll(); }
   if (d.trendtype) { state.trendType = d.trendtype; state.trendSel = null; state.trendScrolled = false; return renderTrend(); }
+  if (d.addday) return addOnDay(d.addday);
   if (d.gomonth) { state.period = d.gomonth; state.calDay = null; return go('month'); }
   if (d.day) { state.calDay = state.calDay === d.day ? null : d.day; return renderCalendar(); }
   if (d.jump) { [state.fltType, state.fltCat] = d.jump.split('|'); state.q = ''; $('#flt-q').value = ''; return go('list'); }
