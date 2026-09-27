@@ -1,0 +1,784 @@
+/* ================= 카테고리 ================= */
+const TYPES = ['지출', '수입', '저축', '투자'];
+// 기본 카테고리. 사용자가 편집하면 설정(settings.cats)에 저장된 목록을 쓴다.
+const DEFAULT_CATS = {
+  '수입': ['월급', '환급금', '기타'],
+  '지출': ['식비', '간식', '카공', '생필품', '취미/문화생활', '자기개발', '의료/건강', '의류', '미용', '여행',
+          '경조사/선물', '가전', '교통비', '통신비', '월세', '기타'],
+  '저축': ['비상금', '적금', '청약', '연금저축'],
+  '투자': ['주식', 'ETF'],
+};
+const cats = t => (state.settings.cats && state.settings.cats[t]) || DEFAULT_CATS[t];
+// 일찍 들어와도 다음 달 몫으로 계산할 "월급" 카테고리. 설정에서 고를 수 있고,
+// 없으면 '월급', 그것도 없으면(이름을 바꾼 경우) 수입의 첫 번째 카테고리.
+const salaryCat = () => {
+  const list = cats('수입'), picked = state.settings.salaryCat;
+  return list.includes(picked) ? picked : list.includes('월급') ? '월급' : list[0];
+};
+const allCats = () => Object.fromEntries(TYPES.map(t => [t, cats(t).slice()]));
+const TYPE_COLOR = { '지출': 'var(--s1)', '저축': 'var(--s2)', '투자': 'var(--s3)', '수입': 'var(--income)' };
+const SALARY_EARLY_DAYS = 7; // 월급일이 주말·공휴일이라 며칠 먼저 들어와도 다음 한 달 몫으로 계산
+
+/* ================= 날짜 · 기간 ================= */
+function ymd(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function parse(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
+function addDays(s, n) { const d = parse(s); d.setDate(d.getDate() + n); return ymd(d); }
+function today() { return ymd(new Date()); }
+
+// 한 달 = 월급일 ~ 다음 월급일 전날. 이름은 "그 돈으로 사는 달" (예: 9/25~10/24 → 10월)
+function periodOfDate(s) {
+  const d = parse(s), p = state.settings.payday;
+  let y = d.getFullYear(), m = d.getMonth() + 1;
+  if (p > 1 && d.getDate() >= p) { m++; if (m > 12) { m = 1; y++; } }
+  return `${y}-${String(m).padStart(2, '0')}`;
+}
+function periodOf(e) {
+  if (e.type === '수입' && e.category === salaryCat()) return periodOfDate(addDays(e.date, SALARY_EARLY_DAYS));
+  return periodOfDate(e.date);
+}
+function periodRange(key) {
+  const [y, m] = key.split('-').map(Number), p = state.settings.payday;
+  if (p === 1) return { start: ymd(new Date(y, m - 1, 1)), end: ymd(new Date(y, m, 0)) };
+  return { start: ymd(new Date(y, m - 2, p)), end: ymd(new Date(y, m - 1, p - 1)) };
+}
+function shiftPeriod(key, n) {
+  const [y, m] = key.split('-').map(Number); const d = new Date(y, m - 1 + n, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+const md = s => { const d = parse(s); return `${d.getMonth() + 1}.${d.getDate()}`; };
+const WD = ['일', '월', '화', '수', '목', '금', '토'];
+
+/* ================= 표시 ================= */
+const won = n => Math.round(n).toLocaleString('ko-KR') + '원';
+const compact = n => n >= 10000 ? (Math.round(n / 1000) / 10).toLocaleString('ko-KR') + '만' : Math.round(n).toLocaleString('ko-KR');
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const $ = s => document.querySelector(s);
+const sign = e => e.type === '수입' ? '+' : e.type === '지출' ? '−' : '';
+const errMsg = err => (err && err.message) || String(err);
+
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+/* ================= 상태 ================= */
+let store = null;
+const state = {
+  user: null, entries: [], settings: { payday: 25 }, pending: false,
+  view: 'add', type: '지출', category: '식비', date: today(), editing: null,
+  period: null, calDay: null, trendType: '지출', fltType: '', fltCat: '', q: '', visible: [],
+  info: false, ceType: '지출', ceDelete: null,
+};
+function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+// 앱 맨 위 제목만 사용자가 바꿀 수 있다. 브라우저 탭·홈 화면·내보내기 파일 이름은 항상 'mooni의 가계부'.
+const DEFAULT_TITLE = 'mooni의 가계부';
+const appTitle = () => (state.settings.title || '').trim() || DEFAULT_TITLE;
+function renderTitle() {
+  $('#app-title').textContent = appTitle();
+}
+
+function renderSync() {
+  $('#sync').textContent = store.demo ? '' : !navigator.onLine ? '오프라인 · 연결되면 동기화' : state.pending ? '동기화 중…' : '동기화됨';
+}
+
+/* ================= 기록 탭 ================= */
+function renderForm() {
+  if (!cats(state.type).includes(state.category)) state.category = cats(state.type)[0];
+  $('#type-seg').innerHTML = TYPES.map(t =>
+    `<button data-type="${t}" aria-pressed="${t === state.type}">${t}</button>`).join('');
+  $('#cat-chips').innerHTML = cats(state.type).map(c =>
+    `<button class="chip" data-cat="${esc(c)}" aria-pressed="${c === state.category}">${esc(c)}</button>`).join('')
+    + '<button class="chip ghost-chip" id="open-cats">＋ 편집</button>';
+  $('#f-date').value = state.date;
+  $('#form-card').classList.toggle('editing', !!state.editing);
+  $('#form-actions').innerHTML = state.editing
+    ? `<button class="btn danger" id="del" style="width:auto;padding:14px 18px">삭제</button>
+       <button class="btn ghost" id="cancel" style="width:auto;padding:14px 18px">취소</button>
+       <button class="btn primary" id="submit">수정 저장</button>`
+    : `<button class="btn primary" id="submit">저장</button>`;
+  renderSuggest();
+  renderDayList();
+}
+
+function renderSuggest() {
+  const freq = new Map();
+  for (const e of state.entries) {
+    if (e.type !== state.type || e.category !== state.category || !e.detail) continue;
+    freq.set(e.detail, (freq.get(e.detail) || 0) + 1);
+  }
+  const top = [...freq].sort((a, b) => b[1] - a[1]).slice(0, 8).map(x => x[0]);
+  $('#suggest').innerHTML = top.map(d => `<button class="chip sm" data-detail="${esc(d)}">${esc(d)}</button>`).join('');
+}
+
+function renderDayList() {
+  const list = state.entries.filter(e => e.date === state.date);
+  const d = parse(state.date);
+  $('#day-title').textContent = (state.date === today() ? '오늘' : `${d.getMonth() + 1}월 ${d.getDate()}일 (${WD[d.getDay()]})`) + ' 기록';
+  $('#day-list').innerHTML = list.length ? list.map(itemHtml).join('') : '<li class="empty">아직 기록이 없어요</li>';
+}
+
+function itemHtml(e) {
+  return `<li class="item" data-id="${esc(e.id)}">
+    <span class="dot" style="background:${TYPE_COLOR[e.type]}"></span>
+    <div class="main"><div class="cat">${e.type} · ${esc(e.category)}</div>
+      <div class="det">${esc(e.detail || '—')}${e.memo ? ` <span class="cat">· ${esc(e.memo)}</span>` : ''}</div></div>
+    <div class="amt num">${sign(e)}${won(e.amount)}</div></li>`;
+}
+
+function amountValue() { return Number($('#f-amount').value.replace(/[^\d]/g, '')) || 0; }
+function setAmount(n) { $('#f-amount').value = n ? n.toLocaleString('ko-KR') : ''; }
+
+function resetForm() {
+  state.editing = null;
+  $('#f-detail').value = ''; setAmount(0); $('#f-memo').value = '';
+  renderForm();
+}
+
+function startEdit(id) {
+  const e = state.entries.find(x => x.id === id); if (!e) return;
+  state.editing = e; state.type = e.type; state.category = e.category; state.date = e.date;
+  $('#f-detail').value = e.detail; setAmount(e.amount); $('#f-memo').value = e.memo || '';
+  go('add'); renderForm(); window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// 저장하면 화면에는 바로 반영되고, 클라우드 동기화는 뒤에서 진행된다 (오프라인이면 연결될 때까지 대기).
+function submit() {
+  const amount = amountValue();
+  if (!amount) { toast('금액을 입력해 주세요'); $('#f-amount').focus(); return; }
+  const prev = state.editing;
+  const e = {
+    id: prev ? prev.id : newId(), date: $('#f-date').value || today(),
+    type: state.type, category: state.category,
+    detail: $('#f-detail').value.trim(), amount, memo: $('#f-memo').value.trim(),
+  };
+  state.date = e.date;
+  resetForm();
+  store.save(e, prev).catch(err => toast('동기화 실패: ' + errMsg(err)));
+  toast(prev ? '수정했어요' : `${e.category} ${won(e.amount)} 저장`);
+}
+
+function removeEditing() {
+  const e = state.editing; if (!e || !confirm(`${e.category} ${won(e.amount)} 기록을 삭제할까요?`)) return;
+  resetForm();
+  store.remove(e).catch(err => toast('동기화 실패: ' + errMsg(err)));
+  toast('삭제했어요');
+}
+
+/* ================= 한 달 탭 ================= */
+function sumBy(list, keyFn) {
+  const m = new Map();
+  for (const e of list) m.set(keyFn(e), (m.get(keyFn(e)) || 0) + e.amount);
+  return m;
+}
+function periodEntries(key) { return state.entries.filter(e => periodOf(e) === key); }
+
+function renderPeriodNav() {
+  const r = periodRange(state.period);
+  const [y, m] = state.period.split('-').map(Number);
+  const html = `<button class="step" data-pshift="-1" aria-label="이전 달">‹</button>
+    <div class="title"><b>${y}년 ${m}월</b><span>${md(r.start)} ~ ${md(r.end)}</span></div>
+    <button class="step" data-pshift="1" aria-label="다음 달">›</button>`;
+  document.querySelectorAll('[data-period-nav]').forEach(el => el.innerHTML = html);
+}
+
+// 비교 기준: 보고 있는 달 직전 12개월 중 기록이 있는 달들의 월평균
+function baseline(key) {
+  const from = shiftPeriod(key, -12);
+  const sums = new Map(), months = new Set();
+  for (const e of state.entries) {
+    const p = periodOf(e);
+    if (p < from || p >= key) continue;
+    months.add(p);
+    for (const k of [e.type, e.type + '|' + e.category]) sums.set(k, (sums.get(k) || 0) + e.amount);
+  }
+  const n = months.size;
+  return { n, avg: k => n ? (sums.get(k) || 0) / n : 0 };
+}
+
+// 월평균 대비 변화: ▲ 12% / ▼ 8% / 신규
+function chg(cur, k) {
+  const b = state.base;
+  if (!b.n || !cur) return '<span class="chg"></span>';
+  const avg = b.avg(k);
+  if (!avg) return '<span class="chg" title="최근 1년 기록 없음">신규</span>';
+  const p = Math.round((cur - avg) / avg * 100);
+  const txt = p > 0 ? `▲${p}%` : p < 0 ? `▼${-p}%` : '–0%';
+  return `<span class="chg num ${p > 0 ? 'up' : p < 0 ? 'down' : ''}" title="최근 1년 월평균 ${won(avg)}">${txt}</span>`;
+}
+
+function renderMonth() {
+  renderPeriodNav();
+  const list = periodEntries(state.period);
+  state.base = baseline(state.period);
+  const byType = sumBy(list, e => e.type);
+  const income = byType.get('수입') || 0;
+  const parts = ['지출', '저축', '투자'].map(t => ({ t, v: byType.get(t) || 0 }));
+  const out = parts.reduce((s, p) => s + p.v, 0);
+  const rest = income - out;
+  const pct = v => income ? Math.round(v / income * 100) + '%' : '';
+
+  // 도넛: 수입이 있으면 수입을 100%로 (남은 돈은 회색), 없거나 초과하면 쓴 돈 합계를 100%로
+  const slices = parts.map((p, i) => ({ label: p.t, v: p.v, color: `var(--s${i + 1})` }));
+  if (rest > 0) slices.push({ label: '남은 돈', v: rest, color: 'var(--rest)' });
+  const center = income && rest >= 0 ? ['남은 돈', won(rest)] : income ? ['초과', '−' + won(-rest)] : ['쓴 돈', won(out)];
+
+  const rows = parts.map((p, i) => `<span class="sw" style="background:var(--s${i + 1})"></span><span>${p.t}</span>
+      <b class="num">${won(p.v)}</b><span class="pct num">${pct(p.v)}</span>${chg(p.v, p.t)}`).join('');
+  const restRow = income
+    ? `${rest >= 0 ? '<span class="sw" style="background:var(--rest)"></span>' : '<span class="sw-over" aria-hidden="true">!</span>'}<span>${rest >= 0 ? '남은 돈' : '초과'}</span>
+       <b class="num ${rest < 0 ? 'over' : ''}">${rest < 0 ? '−' : ''}${won(Math.abs(rest))}</b><span class="pct num">${pct(Math.abs(rest))}</span><span></span>`
+    : '';
+  const notes = [
+    state.base.n ? `▲▼ 최근 1년(${state.base.n}개월) 월평균 대비예요. <span class="up">▲ 늘어남</span> · <span class="down">▼ 줄어듦</span>` : '▲▼ 비교할 최근 1년 기록이 아직 없어요.',
+    state.period === periodOfDate(today()) ? '이번 달은 아직 진행 중이라, 지금까지 쓴 금액으로 비교해요.' : '',
+    income ? '' : '이 기간에는 수입 기록이 없어서 비율(%) 대신 금액만 보여줘요.',
+    `월급은 월급일 ${SALARY_EARLY_DAYS}일 전까지 먼저 들어와도 이 달 수입으로 계산해요.`,
+  ].filter(Boolean);
+  $('#summary').innerHTML = `
+    <div class="card-head">
+      <p class="label">이번 달 수입</p>
+      <button class="icon-btn info-btn" id="info" aria-label="계산 기준 보기" aria-expanded="${state.info}">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="7.8" r=".6" fill="currentColor"/></svg>
+      </button>
+    </div>
+    ${state.info ? `<div class="info-box">${notes.map(n => `<p>${n}</p>`).join('')}</div>` : ''}
+    <div class="hero-row"><div class="hero num">${won(income)}</div>${chg(income, '수입')}</div>
+    ${donutSvg(slices, center)}
+    ${income && rest < 0 ? `<p class="over-note">수입보다 ${pct(-rest)} 더 썼어요</p>` : ''}
+    <div class="legend">${rows}${restRow}</div>`;
+
+  const exp = list.filter(e => e.type === '지출');
+  $('#cat-bars').innerHTML = barsHtml(sumBy(exp, e => e.category), 'var(--s1)', '지출');
+  const sv = list.filter(e => e.type === '저축' || e.type === '투자');
+  $('#save-bars').innerHTML = barsHtml(sumBy(sv, e => e.type + '|' + e.category), null, null);
+
+  renderCalendar();
+}
+
+// 가운데가 빈 원형 차트. 조각 사이에 2px 틈을 두어 색이 붙어 보이지 않게 한다.
+function donutSvg(slices, [top, bottom]) {
+  const R = 58, W = 18, C = 2 * Math.PI * R, GAP = 2;
+  const total = slices.reduce((s, x) => s + x.v, 0);
+  const shown = slices.filter(x => x.v > 0);
+  let off = 0;
+  const arcs = total ? shown.map(x => {
+    const len = x.v / total * C;
+    const dash = shown.length > 1 ? Math.max(len - GAP, 0.5) : len;
+    const arc = `<circle r="${R}" cx="70" cy="70" fill="none" stroke="${x.color}" stroke-width="${W}"
+      stroke-dasharray="${dash} ${C - dash}" stroke-dashoffset="${-off}"><title>${esc(x.label)} ${won(x.v)} (${Math.round(x.v / total * 100)}%)</title></circle>`;
+    off += len;
+    return arc;
+  }).join('') : '';
+  return `<div class="donut"><svg viewBox="0 0 140 140" width="148" height="148" role="img" aria-label="수입 배분">
+    <circle r="${R}" cx="70" cy="70" fill="none" stroke="var(--grid)" stroke-width="${W}"/>
+    <g transform="rotate(-90 70 70)">${arcs}</g>
+    <text x="70" y="64" text-anchor="middle" class="d-top">${esc(top)}</text>
+    <text x="70" y="84" text-anchor="middle" class="d-val">${esc(bottom)}</text></svg></div>`;
+}
+
+function barsHtml(map, color, type) {
+  const rows = [...map].sort((a, b) => b[1] - a[1]);
+  if (!rows.length) return '<p class="empty">기록이 없어요</p>';
+  const max = rows[0][1];
+  return rows.map(([k, v]) => {
+    let t = type, c = k;
+    if (!type) [t, c] = k.split('|');
+    const col = color || `var(--s${t === '저축' ? 2 : 3})`;
+    return `<div class="bar-row" data-jump="${esc(t)}|${esc(c)}"><span class="name">${esc(c)}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${v / max * 100}%;background:${col}"></div></div>
+      <span class="v num">${won(v)}</span>${chg(v, t + '|' + c)}</div>`;
+  }).join('');
+}
+
+// 하루 지출을 "평소 하루 지출"(최근 1년, 지출이 있던 날들의 중간값)과 비교해 4단계 점으로 표시.
+// 중간값이라 월세 같은 큰 결제에 기준이 끌려가지 않는다. 최근 1년 기록이 없으면 이번 달 기록으로 계산.
+const LEVELS = [[0.5, '평소의 절반 미만'], [1, '평소보다 적음'], [2, '평소의 2배 미만'], [Infinity, '평소의 2배 이상']];
+function median(nums) {
+  if (!nums.length) return 0;
+  const a = nums.slice().sort((x, y) => x - y), m = a.length >> 1;
+  return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+}
+function dailySpend(from, to) {
+  return [...sumBy(state.entries.filter(e => e.type === '지출' && e.date >= from && e.date <= to), e => e.date).values()];
+}
+// 달력은 계산 기준(어느 달 몫인지)과 상관없이 실제 날짜 그대로 보여준다.
+// 예: 9/23에 일찍 들어온 월급은 10월 수입으로 계산되지만, 달력에는 9/23에 표시된다.
+function renderCalendar() {
+  const { start, end } = periodRange(state.period);
+  const list = state.entries.filter(e => e.date >= start && e.date <= end);
+  const ex = sumBy(list.filter(e => e.type === '지출'), e => e.date);
+  const inc = sumBy(list.filter(e => e.type === '수입'), e => e.date);
+  const t = today();
+  const past = dailySpend(periodRange(shiftPeriod(state.period, -12)).start, addDays(start, -1));
+  const ref = median(past.length ? past : [...ex.values()]);
+  const level = v => LEVELS.findIndex(([r]) => v < ref * r) + 1;
+
+  let html = WD.map(w => `<div class="wd">${w}</div>`).join('');
+  html += '<div></div>'.repeat(parse(start).getDay());
+  for (let s = start; s <= end; s = addDays(s, 1)) {
+    const d = parse(s), v = ex.get(s);
+    const lab = d.getDate() === 1 || s === start ? `${d.getMonth() + 1}/${d.getDate()}` : d.getDate();
+    html += `<button data-day="${s}" aria-pressed="${s === state.calDay}" class="${d.getDay() === 0 ? 'sun' : ''}"
+      aria-label="${d.getMonth() + 1}월 ${d.getDate()}일${v ? ' 지출 ' + won(v) : ''}">
+      <span class="d ${s === t ? 'today' : ''}">${lab}</span>
+      ${v ? `<span class="lv lv${level(v)}" title="지출 ${won(v)}"></span>` : '<span class="lv"></span>'}
+      ${inc.get(s) ? `<span class="in num">+${compact(inc.get(s))}</span>` : ''}</button>`;
+  }
+  $('#cal').innerHTML = html;
+  $('#cal-legend').innerHTML = ref ? `<span>지출 적음</span>${[1, 2, 3, 4].map(i => `<span class="lv lv${i}" title="${LEVELS[i - 1][1]}"></span>`).join('')}
+    <span>많음</span><span class="mu">· 평소 하루 ${won(ref)} 기준 (${past.length ? '최근 1년' : '이번 달'} 중간값)</span>` : '';
+
+  if (!state.calDay) { $('#cal-list').innerHTML = ''; return; }
+  const dayList = state.entries.filter(e => e.date === state.calDay);
+  const dd = parse(state.calDay), dayEx = ex.get(state.calDay) || 0;
+  $('#cal-list').innerHTML = `<div class="day-head"><span>${dd.getMonth() + 1}월 ${dd.getDate()}일 (${WD[dd.getDay()]})</span>
+    <span class="num">${dayEx ? '지출 ' + won(dayEx) : ''}</span></div>
+    <ul class="list">${dayList.length ? dayList.map(itemHtml).join('') : '<li class="empty">이 날은 기록이 없어요</li>'}</ul>
+    ${dayList.filter(e => periodOf(e) !== state.period).map(e => `<p class="note">이 날 월급(${won(e.amount)})은 월급일 전에 일찍 들어와서 ${Number(periodOf(e).slice(5))}월 수입으로 계산돼요.</p>`).join('')}`;
+}
+
+/* ================= 내역 탭 ================= */
+function renderList() {
+  renderPeriodNav();
+  $('#flt-type').innerHTML = ['<option value="">전체 구분</option>', ...TYPES.map(t =>
+    `<option ${t === state.fltType ? 'selected' : ''}>${t}</option>`)].join('');
+  const names = state.fltType ? cats(state.fltType) : [...new Set(TYPES.flatMap(cats))];
+  if (!names.includes(state.fltCat)) state.fltCat = '';
+  $('#flt-cat').innerHTML = ['<option value="">전체 카테고리</option>', ...names.map(c =>
+    `<option ${c === state.fltCat ? 'selected' : ''}>${esc(c)}</option>`)].join('');
+
+  const q = state.q.trim().toLowerCase();
+  let list = q ? state.entries : periodEntries(state.period);
+  list = list.filter(e => (!state.fltType || e.type === state.fltType) && (!state.fltCat || e.category === state.fltCat)
+    && (!q || (e.detail + ' ' + e.memo).toLowerCase().includes(q)));
+  list.sort((a, b) => b.date.localeCompare(a.date));
+  state.visible = list;
+
+  const shown = list.slice(0, 400);
+  let html = '', cur = null;
+  const dayExp = sumBy(shown.filter(e => e.type === '지출'), e => e.date);
+  for (const e of shown) {
+    if (e.date !== cur) {
+      if (cur) html += '</ul>';
+      cur = e.date; const d = parse(cur);
+      html += `<div class="day-head"><span>${d.getFullYear() !== new Date().getFullYear() ? d.getFullYear() + '. ' : ''}${d.getMonth() + 1}월 ${d.getDate()}일 (${WD[d.getDay()]})</span>
+        <span class="num">${dayExp.get(cur) ? '지출 ' + won(dayExp.get(cur)) : ''}</span></div><ul class="list">`;
+    }
+    html += itemHtml(e);
+  }
+  if (cur) html += '</ul>';
+  const byType = sumBy(list, e => e.type);
+  const totals = TYPES.filter(t => byType.get(t))
+    .map(t => `<span style="white-space:nowrap">${t} <b class="num" style="color:var(--t1)">${won(byType.get(t))}</b></span>`).join('');
+  const head = `<div class="day-head"><span style="white-space:nowrap">${list.length}건${list.length > shown.length ? ` (최근 ${shown.length}건 표시)` : ''}</span>
+    <span style="display:flex;flex-wrap:wrap;justify-content:flex-end;gap:2px 12px">${totals}</span></div>`;
+  $('#all-list').innerHTML = list.length ? head + html : '<p class="empty">조건에 맞는 기록이 없어요</p>';
+}
+
+/* ================= 추이 탭 ================= */
+const PEAK_RATIO = 1.5; // 평소(직전 12개월 월 지출의 중간값)의 1.5배 이상이면 피크
+
+// 첫 기록이 있는 달부터 이번 달까지, 월(월급일 기준)별 합계와 평소 수준 (type: 지출 또는 수입)
+function monthlyTotals(type) {
+  const sums = new Map();
+  for (const e of state.entries) if (e.type === type) sums.set(periodOf(e), (sums.get(periodOf(e)) || 0) + e.amount);
+  if (!sums.size) return [];
+  const keys = [...sums.keys()].sort();
+  const last = [keys.at(-1), periodOfDate(today())].sort().at(-1);
+  const months = [];
+  for (let k = keys[0]; k <= last; k = shiftPeriod(k, 1)) months.push(k);
+  return months.map((k, i) => {
+    const v = sums.get(k) || 0;
+    const prev = months.slice(Math.max(0, i - 12), i).map(x => sums.get(x) || 0);
+    const base = prev.length >= 3 ? median(prev) : 0; // 비교할 달이 3개 이상 쌓여야 판단
+    return { k, v, base, peak: base > 0 && v >= base * PEAK_RATIO };
+  });
+}
+
+function niceMax(v) {
+  const steps = [10, 20, 50, 100, 200, 500, 1000].map(x => x * 10000);
+  const step = steps.find(st => v / st <= 4) || steps.at(-1);
+  return { max: Math.max(step, Math.ceil(v / step) * step), step };
+}
+
+const TREND_TYPES = {
+  '지출': { color: 'var(--s1)', peak: 'var(--up)', verb: '쓴', top: '가장 큰 지출' },
+  '수입': { color: 'var(--income)', peak: 'var(--income)', verb: '들어온', top: '가장 큰 수입' },
+};
+
+function renderTrend() {
+  const type = state.trendType, cfg = TREND_TYPES[type];
+  $('#trend-seg').innerHTML = Object.keys(TREND_TYPES).map(t => `<button data-trendtype="${t}" aria-pressed="${t === type}">${t}</button>`).join('');
+  $('#trend-title').textContent = `월별 ${type}`;
+  $('#trend-leg-name').textContent = type;
+  const view = $('#view-trend');
+  view.style.setProperty('--series', cfg.color); view.style.setProperty('--peak', cfg.peak);
+  const data = monthlyTotals(type);
+  const H = 236, T = 26, B = 34, COL = 44, PAD = 18;
+  const ph = H - T - B;
+  if (!data.length) {
+    $('#trend-sub').textContent = '';
+    $('#trend-axis').innerHTML = ''; $('#trend-chart').innerHTML = '';
+    $('#trend-detail').innerHTML = `<p class="empty">${type} 기록이 쌓이면 그래프가 그려져요</p>`;
+    return;
+  }
+  const { max, step } = niceMax(Math.max(...data.map(d => Math.max(d.v, d.base))));
+  const W = PAD * 2 + COL * (data.length - 1);
+  const X = i => PAD + COL * i, Y = v => T + ph * (1 - v / max);
+  const peaks = data.filter(d => d.peak).length;
+  const label = k => `${k.slice(2, 4)}.${Number(k.slice(5))}`;
+  $('#trend-sub').textContent = `${label(data[0].k)} ~ ${label(data.at(-1).k)} · ${data.length}개월 · 피크 ${peaks}번`;
+
+  const ticks = []; for (let v = 0; v <= max; v += step) ticks.push(v);
+  $('#trend-axis').setAttribute('viewBox', `0 0 40 ${H}`);
+  $('#trend-axis').innerHTML = ticks.map(v => `<text x="36" y="${Y(v) + 3}" text-anchor="end">${v ? compact(v) : 0}</text>`).join('');
+
+  const svg = $('#trend-chart');
+  svg.setAttribute('width', W); svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('aria-label', `월별 ${type} 그래프, 피크 ${peaks}번`);
+  const line = data.map((d, i) => `${X(i)},${Y(d.v)}`).join(' ');
+  const baseSegs = data.map((d, i) => d.base ? `${X(i)},${Y(d.base)}` : null);
+  const basePath = baseSegs.reduce((acc, p, i) => acc + (p ? `${i && baseSegs[i - 1] ? 'L' : 'M'}${p}` : ''), '');
+  const sel = data.findIndex(d => d.k === state.trendSel);
+
+  let g = ticks.map(v => `<line class="grid-l" x1="0" x2="${W}" y1="${Y(v)}" y2="${Y(v)}"/>`).join('');
+  g += `<polygon class="area" points="${X(0)},${Y(0)} ${line} ${X(data.length - 1)},${Y(0)}"/>`;
+  g += `<path class="base-l" d="${basePath}"/><polyline class="line" points="${line}"/>`;
+  data.forEach((d, i) => {
+    const m = Number(d.k.slice(5));
+    g += `<text x="${X(i)}" y="${H - 18}" text-anchor="middle">${m}월</text>`;
+    if (m === 1 || i === 0) g += `<text class="yr" x="${X(i)}" y="${H - 4}" text-anchor="middle">${d.k.slice(0, 4)}</text>`;
+    g += `<rect class="hit" data-tm="${d.k}" x="${X(i) - COL / 2}" y="0" width="${COL}" height="${H}"><title>${label(d.k)} ${won(d.v)}</title></rect>`;
+    g += `<line class="guide ${i === sel ? 'on' : ''}" x1="${X(i)}" x2="${X(i)}" y1="${Y(d.v)}" y2="${T + ph}"/>`; // 점에서 바닥까지만
+  });
+  data.forEach((d, i) => { if (d.peak) g += `<circle class="pk" cx="${X(i)}" cy="${Y(d.v)}" r="5.5"/>`; });
+  if (sel >= 0) {
+    const d = data[sel], txt = compact(d.v) + '원', w = txt.length * 6.6 + 14;
+    const bx = Math.min(Math.max(X(sel) - w / 2, 2), W - w - 2), by = Math.max(Y(d.v) - 30, 0);
+    g += `<circle class="sel" cx="${X(sel)}" cy="${Y(d.v)}" r="5"/>
+      <g class="bubble"><rect x="${bx}" y="${by}" width="${w}" height="20" rx="10"/><text x="${bx + w / 2}" y="${by + 14}" text-anchor="middle">${txt}</text></g>`;
+  }
+  svg.innerHTML = g;
+
+  const sc = $('#trend-scroll');
+  if (!state.trendScrolled) { sc.scrollLeft = sc.scrollWidth; state.trendScrolled = true; } // 처음엔 최근 달부터
+  if (sel >= 0) { // 고른 달이 가장자리에 걸리면 안쪽으로 당겨서 말풍선까지 보이게
+    const x = X(sel), room = 50;
+    if (x < sc.scrollLeft + room) sc.scrollLeft = x - room;
+    else if (x > sc.scrollLeft + sc.clientWidth - room) sc.scrollLeft = x - sc.clientWidth + room;
+  }
+  renderTrendDetail(sel >= 0 ? data[sel] : null);
+}
+
+function renderTrendDetail(d) {
+  const box = $('#trend-detail');
+  if (!d) {
+    const cfg = TREND_TYPES[state.trendType];
+    box.innerHTML = `<p class="empty" style="padding:6px 0">그래프의 점을 누르면 그 달을 자세히 볼 수 있어요<br>동그라미는 평소보다 1.5배 넘게 ${cfg.verb} 달이에요</p>`;
+    return;
+  }
+  const r = periodRange(d.k), [y, m] = d.k.split('-').map(Number);
+  const top = state.entries.filter(e => e.type === state.trendType && periodOf(e) === d.k).sort((a, b) => b.amount - a.amount).slice(0, 3);
+  const diff = d.base ? Math.round((d.v - d.base) / d.base * 100) : null;
+  box.innerHTML = `
+    <div class="td-top">
+      <div><p class="label" style="margin:0">${y}년 ${m}월 · ${md(r.start)} ~ ${md(r.end)}${d.peak ? '<span class="peak-badge">피크</span>' : ''}</p>
+        <div class="hero num">${won(d.v)}</div></div>
+      <button class="chip" data-gomonth="${d.k}">이 달 보기</button>
+    </div>
+    <p class="td-cmp">${d.base && !diff ? `평소(${won(d.base)})와 같아요` : d.base ? `평소 ${won(d.base)}보다 <b class="${diff > 0 ? 'chg up' : 'chg down'}" style="font-size:13px">${diff > 0 ? '▲' : '▼'}${Math.abs(diff)}%</b>` : '평소와 비교하려면 3개월 이상 기록이 필요해요'}</p>
+    ${top.length ? `<p class="label">${TREND_TYPES[state.trendType].top}</p><ul class="list">${top.map(itemHtml).join('')}</ul>` : ''}`;
+}
+
+/* ================= 화면 전환 ================= */
+function go(view) {
+  state.view = view;
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === 'view-' + view));
+  document.querySelectorAll('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.view === view));
+  refreshAll();
+}
+function refreshAll() {
+  if (!state.user) return;
+  renderSync();
+  renderTitle();
+  if (state.view === 'add') renderForm();
+  if (state.view === 'month') renderMonth();
+  if (state.view === 'list') renderList();
+  if (state.view === 'trend') renderTrend();
+}
+
+/* ================= 내보내기 ================= */
+const EXPORT_HEAD = ['날짜', '구분', '카테고리', '상세내역', '금액', '메모', 'ID'];
+function exportRows() {
+  const scope = document.querySelector('input[name=ex-scope]:checked').value;
+  const list = (scope === 'view' ? state.visible : state.entries).slice().sort((a, b) => a.date.localeCompare(b.date));
+  return [EXPORT_HEAD].concat(list.map(e => [e.date, e.type, e.category, e.detail, e.amount, e.memo, e.id]));
+}
+
+function openExport() {
+  $('#ex-all').textContent = `전체 기록 (${state.entries.length.toLocaleString()}건)`;
+  $('#ex-view').textContent = `지금 내역 탭에 보이는 것 (${state.visible.length.toLocaleString()}건)`;
+  $('#ex-msg').textContent = '';
+  $('#export').showModal();
+}
+
+function exportCsv() {
+  const cell = v => /[",\n\r]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : v;
+  const csv = exportRows().map(r => r.map(cell).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })); // BOM: 엑셀 한글 깨짐 방지
+  a.download = `mooni의 가계부_${today()}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  $('#ex-msg').textContent = 'CSV 파일을 저장했어요.';
+}
+
+async function exportSheet() {
+  const msg = $('#ex-msg');
+  msg.textContent = '구글 계정 확인 중…';
+  try {
+    const url = await store.exportToSheet(`mooni의 가계부 ${today()}`, exportRows());
+    msg.innerHTML = `내 구글 드라이브에 만들었어요. <a href="${esc(url)}" target="_blank" rel="noopener">스프레드시트 열기 →</a>`;
+  } catch (err) {
+    msg.textContent = err && err.code === 'auth/popup-closed-by-user' ? '취소했어요.' : '만들기 실패: ' + errMsg(err);
+  }
+}
+
+/* ================= 카테고리 편집 ================= */
+function openCats(type) {
+  state.ceType = type || state.type; state.ceDelete = null;
+  $('#ce-new').value = '';
+  renderCats();
+  if (!$('#cat-editor').open) $('#cat-editor').showModal();
+}
+
+function renderCats() {
+  const t = state.ceType;
+  const counts = new Map();
+  for (const e of state.entries) if (e.type === t) counts.set(e.category, (counts.get(e.category) || 0) + 1);
+  $('#ce-seg').innerHTML = TYPES.map(x => `<button data-cetype="${x}" aria-pressed="${x === t}">${x}</button>`).join('');
+  $('#ce-list').innerHTML = cats(t).map(c => {
+    const k = counts.get(c) || 0;
+    const row = `<li class="ce-row">
+      <input class="input ce-name" data-old="${esc(c)}" value="${esc(c)}" maxlength="20" aria-label="${esc(c)} 이름">
+      <span class="ce-count num">${k ? k.toLocaleString() + '건' : ''}</span>
+      <button class="icon-btn" data-cedel="${esc(c)}" aria-label="${esc(c)} 삭제">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
+      </button></li>`;
+    if (state.ceDelete !== c) return row;
+    const others = cats(t).filter(x => x !== c);
+    return row + `<li class="ce-move">기록 ${k.toLocaleString()}건을
+      <select class="input" id="ce-target">${others.map(x => `<option>${esc(x)}</option>`).join('')}</select>로 옮기고
+      <span class="row" style="margin-top:8px"><button class="btn danger" id="ce-del-ok" style="padding:8px">삭제</button>
+      <button class="btn ghost" id="ce-del-cancel" style="padding:8px">취소</button></span></li>`;
+  }).join('');
+}
+
+function saveCats(type, list, extra = {}) {
+  const next = allCats(); next[type] = list;
+  return store.saveSettings({ cats: next, ...extra }).catch(err => toast('저장 실패: ' + errMsg(err)));
+}
+
+function moveCategory(type, from, to) {
+  const list = state.entries.filter(e => e.type === type && e.category === from);
+  if (state.type === type && state.category === from) state.category = to;
+  if (state.fltType === type && state.fltCat === from) state.fltCat = to;
+  if (list.length) store.moveEntries(list, to).catch(err => toast('기록 옮기기 실패: ' + errMsg(err)));
+}
+
+function addCat() {
+  const t = state.ceType, name = $('#ce-new').value.trim();
+  if (!name) return $('#ce-new').focus();
+  if (cats(t).includes(name)) return toast('이미 있는 카테고리예요');
+  saveCats(t, cats(t).concat(name));
+  $('#ce-new').value = '';
+  toast(`${t} · ${name} 추가`);
+}
+
+function renameCat(input) {
+  const t = state.ceType, from = input.dataset.old, to = input.value.trim();
+  if (!to || to === from) { input.value = from; return; }
+  const list = cats(t);
+  const keepSalary = t === '수입' && from === salaryCat() ? { salaryCat: to } : {}; // 월급 규칙이 새 이름을 따라가게
+  if (list.includes(to)) {
+    if (!confirm(`'${to}' 카테고리가 이미 있어요. '${from}' 기록을 '${to}'로 합칠까요?`)) { input.value = from; return; }
+    saveCats(t, list.filter(c => c !== from), keepSalary);
+  } else {
+    saveCats(t, list.map(c => c === from ? to : c), keepSalary);
+  }
+  moveCategory(t, from, to);
+  toast(`'${from}' → '${to}'`);
+}
+
+function deleteCat(name) {
+  const t = state.ceType, list = cats(t);
+  if (list.length === 1) return toast('카테고리는 하나 이상 있어야 해요');
+  const has = state.entries.some(e => e.type === t && e.category === name);
+  if (has) { // 기록을 옮길 곳부터 고르게 한다
+    state.ceDelete = name; renderCats();
+    return $('.ce-move').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+  if (!confirm(`'${name}' 카테고리를 삭제할까요?`)) return;
+  saveCats(t, list.filter(c => c !== name));
+  toast(`'${name}' 삭제`);
+}
+
+function confirmDeleteCat() {
+  const t = state.ceType, name = state.ceDelete, to = $('#ce-target').value;
+  state.ceDelete = null;
+  saveCats(t, cats(t).filter(c => c !== name));
+  moveCategory(t, name, to);
+  toast(`'${name}' 삭제 · 기록은 '${to}'로 옮겼어요`);
+}
+
+/* ================= 설정 · 가져오기 ================= */
+function openSettings() {
+  $('#s-account').textContent = state.user.email || '';
+  $('#s-title').value = appTitle();
+  $('#sign-out').hidden = store.demo;
+  $('#s-payday').innerHTML = Array.from({ length: 28 }, (_, i) => i + 1)
+    .map(n => `<option value="${n}" ${n === state.settings.payday ? 'selected' : ''}>${n === 1 ? '매달 1일 (달력 그대로)' : `매달 ${n}일`}</option>`).join('');
+  $('#s-salary').innerHTML = cats('수입').map(c => `<option ${c === salaryCat() ? 'selected' : ''}>${esc(c)}</option>`).join('');
+  $('#s-import-msg').textContent = '';
+  $('#settings').showModal();
+}
+
+function parseCsv(text) {
+  const rows = []; let row = [], f = '', q = false;
+  text = text.replace(/^﻿/, '');
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"' && text[i + 1] === '"') { f += '"'; i++; } else if (c === '"') q = false; else f += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { row.push(f); f = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(f); rows.push(row); row = []; f = ''; }
+    else f += c;
+  }
+  if (f || row.length) { row.push(f); rows.push(row); }
+  return rows.filter(r => r.some(Boolean));
+}
+
+async function importCsv(file) {
+  const msg = $('#s-import-msg');
+  const [head, ...body] = parseCsv(await file.text());
+  const col = n => head.indexOf(n);
+  const need = ['날짜', '구분', '카테고리', '상세내역', '금액'];
+  if (need.some(n => col(n) < 0)) { msg.textContent = `열 이름이 달라요. 필요한 열: ${need.join(', ')}`; return; }
+  const known = new Set(state.entries.map(e => e.id));
+  const rows = body.map(r => ({
+    id: (col('ID') >= 0 && r[col('ID')]) || newId(), date: r[col('날짜')], type: r[col('구분')], category: r[col('카테고리')],
+    detail: r[col('상세내역')], amount: Number(String(r[col('금액')]).replace(/[^\d.-]/g, '')) || 0,
+    memo: col('메모') >= 0 ? r[col('메모')] || '' : '',
+  })).filter(e => !known.has(e.id));
+  const bad = rows.filter(e => !TYPES.includes(e.type) || !cats(e.type).includes(e.category) || !/^\d{4}-\d{2}-\d{2}$/.test(e.date));
+  if (bad.length) { msg.textContent = `형식이 맞지 않는 행이 ${bad.length}개 있어요 (예: ${bad[0].date} ${bad[0].type}/${bad[0].category}). 없는 카테고리라면 먼저 카테고리 편집에서 추가해 주세요.`; return; }
+  if (!rows.length) { msg.textContent = '새로 가져올 내역이 없어요 (이미 모두 들어 있어요).'; return; }
+  if (!confirm(`${rows.length.toLocaleString()}건을 가져올까요?`)) return;
+  msg.textContent = '가져오는 중…';
+  try { await store.importMany(rows); msg.textContent = `${rows.length.toLocaleString()}건을 가져왔어요.`; }
+  catch (err) { msg.textContent = '가져오기 실패: ' + errMsg(err) + ' — 다시 시도하면 빠진 것만 이어서 가져와요.'; }
+}
+
+/* ================= 이벤트 ================= */
+$('#trend-chart').addEventListener('click', ev => {
+  const r = ev.target.closest('[data-tm]'); if (!r) return;
+  state.trendSel = state.trendSel === r.dataset.tm ? null : r.dataset.tm;
+  renderTrend();
+});
+document.addEventListener('click', ev => {
+  const b = ev.target.closest('button, .item, .bar-row'); if (!b) return;
+  const d = b.dataset;
+  if (d.view) return go(d.view);
+  if (d.type) { state.type = d.type; state.category = cats(d.type)[0]; return renderForm(); }
+  if (d.cat) { state.category = d.cat; return renderForm(); }
+  if (d.detail) { $('#f-detail').value = d.detail; return $('#f-amount').focus(); }
+  if (d.add !== undefined) { setAmount(d.add === '0' ? 0 : amountValue() + Number(d.add)); return; }
+  if (d.shift) { state.date = addDays($('#f-date').value || today(), Number(d.shift)); return renderForm(); }
+  if (d.pshift) { state.period = shiftPeriod(state.period, Number(d.pshift)); state.calDay = null; return refreshAll(); }
+  if (d.trendtype) { state.trendType = d.trendtype; state.trendSel = null; state.trendScrolled = false; return renderTrend(); }
+  if (d.gomonth) { state.period = d.gomonth; state.calDay = null; return go('month'); }
+  if (d.day) { state.calDay = state.calDay === d.day ? null : d.day; return renderCalendar(); }
+  if (d.jump) { [state.fltType, state.fltCat] = d.jump.split('|'); state.q = ''; $('#flt-q').value = ''; return go('list'); }
+  if (d.id) return startEdit(d.id);
+  if (d.close !== undefined) return b.closest('dialog').close();
+  if (d.cetype) { state.ceType = d.cetype; state.ceDelete = null; return renderCats(); }
+  if (d.cedel) return deleteCat(d.cedel);
+  switch (b.id) {
+    case 'submit': return submit();
+    case 'cancel': return resetForm();
+    case 'del': return removeEditing();
+    case 'open-settings': return openSettings();
+    case 'open-export': return openExport();
+    case 'open-cats': if ($('#settings').open) $('#settings').close(); return openCats();
+    case 'ce-add': return addCat();
+    case 'ce-del-ok': return confirmDeleteCat();
+    case 'ce-del-cancel': state.ceDelete = null; return renderCats();
+    case 'info': state.info = !state.info; return renderMonth();
+    case 'ex-csv': return exportCsv();
+    case 'ex-sheet': return exportSheet();
+    case 'sign-in': return store.signIn().catch(err => toast('로그인 실패: ' + errMsg(err)));
+    case 'sign-out': $('#settings').close(); return store.signOut();
+  }
+});
+$('#f-date').addEventListener('change', e => { state.date = e.target.value || today(); renderDayList(); });
+$('#f-amount').addEventListener('input', () => setAmount(amountValue()));
+$('#f-amount').addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+$('#flt-type').addEventListener('change', e => { state.fltType = e.target.value; renderList(); });
+$('#flt-cat').addEventListener('change', e => { state.fltCat = e.target.value; renderList(); });
+$('#flt-q').addEventListener('input', e => { state.q = e.target.value; renderList(); });
+$('#s-payday').addEventListener('change', e => {
+  store.saveSettings({ payday: Number(e.target.value) }).catch(err => toast('설정 저장 실패: ' + errMsg(err)));
+  toast('월급일을 바꿨어요');
+});
+$('#s-title').addEventListener('change', e => {
+  const title = e.target.value.trim(); // 비우면 기본 이름으로 돌아감
+  e.target.value = title || DEFAULT_TITLE;
+  store.saveSettings({ title }).catch(err => toast('설정 저장 실패: ' + errMsg(err)));
+  toast(title ? '이름을 바꿨어요' : `기본 이름(${DEFAULT_TITLE})으로 돌아갔어요`);
+});
+$('#s-title').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
+$('#s-salary').addEventListener('change', e => {
+  store.saveSettings({ salaryCat: e.target.value }).catch(err => toast('설정 저장 실패: ' + errMsg(err)));
+  toast(`'${e.target.value}'을 월급으로 계산해요`);
+});
+$('#s-import').addEventListener('change', ev => {
+  const file = ev.target.files[0]; ev.target.value = '';
+  if (file) importCsv(file);
+});
+$('#ce-new').addEventListener('keydown', e => { if (e.key === 'Enter') addCat(); });
+$('#ce-list').addEventListener('change', e => { if (e.target.classList.contains('ce-name')) renameCat(e.target); });
+$('#ce-list').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList.contains('ce-name')) e.target.blur(); });
+addEventListener('online', renderSync);
+addEventListener('offline', renderSync);
+
+/* ================= 시작 ================= */
+function onData(data) {
+  const paydayChanged = data.settings.payday !== state.settings.payday;
+  state.entries = data.entries; state.settings = data.settings; state.pending = data.pending;
+  if (paydayChanged || !state.period) state.period = periodOfDate(today());
+  if (state.editing && !state.entries.some(e => e.id === state.editing.id)) state.editing = null; // 다른 기기에서 삭제됨
+  refreshAll();
+  if ($('#cat-editor').open && !document.activeElement.classList.contains('ce-name')) renderCats();
+}
+
+createStore().then(s => {
+  store = s;
+  document.body.classList.toggle('demo', store.demo);
+  const hash = new URLSearchParams(location.hash.slice(1));
+  store.onAuth(user => {
+    state.user = user;
+    document.body.classList.remove('booting');
+    document.body.classList.toggle('signed-out', !user);
+    if (!user) { state.entries = []; state.visible = []; state.editing = null; return; }
+    if (!state.period) state.period = periodOfDate(today());
+    store.listen(onData);
+    go(hash.get('tab') || 'add');
+    if (hash.get('day')) { state.calDay = hash.get('day'); refreshAll(); }
+  });
+}).catch(err => {
+  document.body.classList.remove('booting');
+  document.body.innerHTML = `<p class="empty" style="padding:40px 16px">앱을 불러오지 못했어요: ${esc(errMsg(err))}</p>`;
+});
+
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js');
