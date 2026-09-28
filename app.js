@@ -9,15 +9,8 @@ const DEFAULT_CATS = {
   '투자': ['주식', 'ETF'],
 };
 const cats = t => (state.settings.cats && state.settings.cats[t]) || DEFAULT_CATS[t];
-// 일찍 들어와도 다음 달 몫으로 계산할 "월급" 카테고리. 설정에서 고를 수 있고,
-// 없으면 '월급', 그것도 없으면(이름을 바꾼 경우) 수입의 첫 번째 카테고리.
-const salaryCat = () => {
-  const list = cats('수입'), picked = state.settings.salaryCat;
-  return list.includes(picked) ? picked : list.includes('월급') ? '월급' : list[0];
-};
 const allCats = () => Object.fromEntries(TYPES.map(t => [t, cats(t).slice()]));
 const TYPE_COLOR = { '지출': 'var(--s1)', '저축': 'var(--s2)', '투자': 'var(--s3)', '수입': 'var(--income)' };
-const SALARY_EARLY_DAYS = 7; // 월급일이 주말·공휴일이라 며칠 먼저 들어와도 다음 한 달 몫으로 계산
 
 /* ================= 날짜 · 기간 ================= */
 function ymd(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
@@ -32,10 +25,8 @@ function periodOfDate(s) {
   if (p > 1 && d.getDate() >= p) { m++; if (m > 12) { m = 1; y++; } }
   return `${y}-${String(m).padStart(2, '0')}`;
 }
-function periodOf(e) {
-  if (e.type === '수입' && e.category === salaryCat()) return periodOfDate(addDays(e.date, SALARY_EARLY_DAYS));
-  return periodOfDate(e.date);
-}
+// 모든 기록(월급 포함)은 실제 날짜가 속한 기간의 몫이다
+const periodOf = e => periodOfDate(e.date);
 function periodRange(key) {
   const [y, m] = key.split('-').map(Number), p = state.settings.payday;
   if (p === 1) return { start: ymd(new Date(y, m - 1, 1)), end: ymd(new Date(y, m, 0)) };
@@ -233,7 +224,7 @@ function renderMonth() {
     state.base.n ? `▲▼ 최근 1년(${state.base.n}개월) 월평균 대비예요. <span class="up">▲ 늘어남</span> · <span class="down">▼ 줄어듦</span>` : '▲▼ 비교할 최근 1년 기록이 아직 없어요.',
     state.period === periodOfDate(today()) ? '이번 달은 아직 진행 중이라, 지금까지 쓴 금액으로 비교해요.' : '',
     income ? '' : '이 기간에는 수입 기록이 없어서 비율(%) 대신 금액만 보여줘요.',
-    `월급은 월급일 ${SALARY_EARLY_DAYS}일 전까지 먼저 들어와도 이 달 수입으로 계산해요.`,
+    '수입·지출 모두 실제 날짜가 이 기간 안에 있는 기록만 계산해요.',
   ].filter(Boolean);
   $('#summary').innerHTML = `
     <div class="card-head">
@@ -335,8 +326,7 @@ function renderCalendar() {
   $('#cal-list').innerHTML = `<div class="day-head"><span>${dd.getMonth() + 1}월 ${dd.getDate()}일 (${WD[dd.getDay()]})</span>
     <span class="num">${dayEx ? '지출 ' + won(dayEx) : ''}</span></div>
     <button class="btn ghost add-day" data-addday="${state.calDay}">＋ 이 날 내역 추가</button>
-    <ul class="list">${dayList.length ? dayList.map(itemHtml).join('') : '<li class="empty">이 날은 기록이 없어요</li>'}</ul>
-    ${dayList.filter(e => periodOf(e) !== state.period).map(e => `<p class="note">이 날 월급(${won(e.amount)})은 월급일 전에 일찍 들어와서 ${Number(periodOf(e).slice(5))}월 수입으로 계산돼요.</p>`).join('')}`;
+    <ul class="list">${dayList.length ? dayList.map(itemHtml).join('') : '<li class="empty">이 날은 기록이 없어요</li>'}</ul>`;
 }
 
 // 달력에서 고른 날짜로 기록 탭을 연다
@@ -585,9 +575,9 @@ function renderCats() {
   }).join('');
 }
 
-function saveCats(type, list, extra = {}) {
+function saveCats(type, list) {
   const next = allCats(); next[type] = list;
-  return store.saveSettings({ cats: next, ...extra }).catch(err => toast('저장 실패: ' + errMsg(err)));
+  return store.saveSettings({ cats: next }).catch(err => toast('저장 실패: ' + errMsg(err)));
 }
 
 function moveCategory(type, from, to) {
@@ -610,12 +600,11 @@ function renameCat(input) {
   const t = state.ceType, from = input.dataset.old, to = input.value.trim();
   if (!to || to === from) { input.value = from; return; }
   const list = cats(t);
-  const keepSalary = t === '수입' && from === salaryCat() ? { salaryCat: to } : {}; // 월급 규칙이 새 이름을 따라가게
   if (list.includes(to)) {
     if (!confirm(`'${to}' 카테고리가 이미 있어요. '${from}' 기록을 '${to}'로 합칠까요?`)) { input.value = from; return; }
-    saveCats(t, list.filter(c => c !== from), keepSalary);
+    saveCats(t, list.filter(c => c !== from));
   } else {
-    saveCats(t, list.map(c => c === from ? to : c), keepSalary);
+    saveCats(t, list.map(c => c === from ? to : c));
   }
   moveCategory(t, from, to);
   toast(`'${from}' → '${to}'`);
@@ -649,7 +638,6 @@ function openSettings() {
   $('#sign-out').hidden = store.demo;
   $('#s-payday').innerHTML = Array.from({ length: 28 }, (_, i) => i + 1)
     .map(n => `<option value="${n}" ${n === state.settings.payday ? 'selected' : ''}>${n === 1 ? '매달 1일 (달력 그대로)' : `매달 ${n}일`}</option>`).join('');
-  $('#s-salary').innerHTML = cats('수입').map(c => `<option ${c === salaryCat() ? 'selected' : ''}>${esc(c)}</option>`).join('');
   $('#s-import-msg').textContent = '';
   $('#settings').showModal();
 }
@@ -749,10 +737,6 @@ $('#s-title').addEventListener('change', e => {
   toast(title ? '이름을 바꿨어요' : `기본 이름(${DEFAULT_TITLE})으로 돌아갔어요`);
 });
 $('#s-title').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
-$('#s-salary').addEventListener('change', e => {
-  store.saveSettings({ salaryCat: e.target.value }).catch(err => toast('설정 저장 실패: ' + errMsg(err)));
-  toast(`'${e.target.value}'을 월급으로 계산해요`);
-});
 $('#s-import').addEventListener('change', ev => {
   const file = ev.target.files[0]; ev.target.value = '';
   if (file) importCsv(file);
