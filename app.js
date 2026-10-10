@@ -399,7 +399,7 @@ function renderList() {
 }
 
 /* ================= 추이 탭 ================= */
-const PEAK_RATIO = 1.5; // 평소(직전 12개월 월 지출의 중간값)의 1.5배 이상이면 피크
+const PEAK_RATIO = 1.5; // 평소(직전 12개월 월 금액의 평균)의 1.5배 이상이면 피크
 
 // 첫 기록이 있는 달부터 이번 달까지, 월(월급일 기준)별 합계와 평소 수준 (type: 지출 또는 수입, cat: 비우면 전체)
 // 카테고리를 골라도 기간은 그 type 전체 기록 기준이라, 카테고리를 바꿔도 가로축이 그대로예요
@@ -418,7 +418,7 @@ function monthlyTotals(type, cat = '') {
   return months.map((k, i) => {
     const v = sums.get(k) || 0;
     const prev = months.slice(Math.max(0, i - 12), i).map(x => sums.get(x) || 0);
-    const base = prev.length >= 3 ? median(prev) : 0; // 비교할 달이 3개 이상 쌓여야 판단
+    const base = prev.length >= 3 ? Math.round(prev.reduce((a, b) => a + b, 0) / prev.length) : 0; // 비교할 달이 3개 이상 쌓여야 판단
     return { k, v, base, peak: base > 0 && v >= base * PEAK_RATIO };
   });
 }
