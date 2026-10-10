@@ -437,8 +437,11 @@ function renderTrend() {
     return;
   }
   const { max, step } = niceMax(Math.max(...data.map(d => Math.max(d.v, d.base))));
-  const W = PAD * 2 + COL * (data.length - 1);
-  const X = i => PAD + COL * i, Y = v => T + ph * (1 - v / max);
+  // 달이 적어도 그래프가 카드 가로폭을 다 채우게 간격을 넓힘 (달이 많으면 COL 간격으로 옆으로 밀어 보기)
+  const n = data.length, fill = $('#trend-scroll').clientWidth;
+  const col = n > 1 ? Math.max(COL, (fill - PAD * 2) / (n - 1)) : COL;
+  const W = n > 1 ? PAD * 2 + col * (n - 1) : Math.max(fill, PAD * 2);
+  const X = i => n > 1 ? PAD + col * i : W / 2, Y = v => T + ph * (1 - v / max);
   const peaks = data.filter(d => d.peak).length;
   const label = k => `${k.slice(2, 4)}.${Number(k.slice(5))}`;
   $('#trend-sub').textContent = `${label(data[0].k)} ~ ${label(data.at(-1).k)} · ${data.length}개월 · 피크 ${peaks}번`;
@@ -462,7 +465,7 @@ function renderTrend() {
     const m = Number(d.k.slice(5));
     g += `<text x="${X(i)}" y="${H - 18}" text-anchor="middle">${m}월</text>`;
     if (m === 1 || i === 0) g += `<text class="yr" x="${X(i)}" y="${H - 4}" text-anchor="middle">${d.k.slice(0, 4)}</text>`;
-    g += `<rect class="hit" data-tm="${d.k}" x="${X(i) - COL / 2}" y="0" width="${COL}" height="${H}"><title>${label(d.k)} ${won(d.v)}</title></rect>`;
+    g += `<rect class="hit" data-tm="${d.k}" x="${X(i) - col / 2}" y="0" width="${col}" height="${H}"><title>${label(d.k)} ${won(d.v)}</title></rect>`;
     g += `<line class="guide ${i === sel ? 'on' : ''}" x1="${X(i)}" x2="${X(i)}" y1="${Y(d.v)}" y2="${T + ph}"/>`; // 점에서 바닥까지만
   });
   data.forEach((d, i) => { if (d.peak) g += `<circle class="pk" cx="${X(i)}" cy="${Y(d.v)}" r="5.5"/>`; });
@@ -695,6 +698,7 @@ async function importCsv(file) {
 }
 
 /* ================= 이벤트 ================= */
+addEventListener('resize', () => { if (state.view === 'trend') renderTrend(); }); // 화면 폭이 바뀌면 그래프 폭도 다시 맞춤
 $('#trend-chart').addEventListener('click', ev => {
   const r = ev.target.closest('[data-tm]'); if (!r) return;
   state.trendSel = state.trendSel === r.dataset.tm ? null : r.dataset.tm;
