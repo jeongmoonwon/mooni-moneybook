@@ -202,13 +202,12 @@
 
 <!-- 달 고르기 -->
 <dialog id="month-picker"><div class="body">
-  <div class="period" style="margin-bottom:14px">
-    <button class="step" data-pickyear="-1" aria-label="이전 해">‹</button>
-    <div class="title"><b id="mp-year"></b></div>
-    <button class="step" data-pickyear="1" aria-label="다음 해">›</button>
+  <h2>달 고르기</h2>
+  <div class="wheels">
+    <div class="wheel" id="mp-y" aria-label="연도"></div>
+    <div class="wheel" id="mp-m" aria-label="월"></div>
   </div>
-  <div class="mp-grid" id="mp-grid"></div>
-  <div class="actions"><button class="btn ghost" data-close>닫기</button></div>
+  <div class="actions"><button class="btn ghost" data-close>취소</button><button class="btn primary" data-pickok>확인</button></div>
 </div></dialog>
 
 <div id="toast" role="status"></div>

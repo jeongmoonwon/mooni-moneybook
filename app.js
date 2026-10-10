@@ -175,15 +175,25 @@ function renderPeriodNav() {
   document.querySelectorAll('[data-period-nav]').forEach(el => el.innerHTML = html);
 }
 
-// 달 고르기 창: 연도를 넘기며 12달 중 하나를 누르면 그 달로 이동. 기록이 없는 달은 흐리게
-function renderMonthPicker() {
-  const y = state.pickYear, has = new Set(state.entries.map(periodOf)), now = periodOfDate(today());
-  $('#mp-year').textContent = `${y}년`;
-  $('#mp-grid').innerHTML = Array.from({ length: 12 }, (_, i) => {
-    const k = `${y}-${String(i + 1).padStart(2, '0')}`;
-    return `<button class="chip${has.has(k) ? '' : ' mp-empty'}${k === now ? ' mp-now' : ''}" data-pickperiod="${k}" aria-pressed="${k === state.period}">${i + 1}월</button>`;
-  }).join('');
+// 달 고르기 창: 연도·월 두 줄을 위아래로 돌려서 가운데 칸에 온 값을 고름 (첫 기록 해 ~ 내년)
+const WHEEL_ROW = 44;
+function openMonthPicker() {
+  const [py, pm] = state.period.split('-').map(Number);
+  const years = state.entries.map(e => Number(periodOf(e).slice(0, 4)));
+  const from = Math.min(py, new Date().getFullYear(), ...years), to = Math.max(py, new Date().getFullYear() + 1);
+  const ys = Array.from({ length: to - from + 1 }, (_, i) => from + i);
+  const fill = (el, vals, unit) => el.innerHTML = vals.map(v => `<div class="wheel-item">${v}${unit}</div>`).join('');
+  fill($('#mp-y'), ys, '년'); fill($('#mp-m'), Array.from({ length: 12 }, (_, i) => i + 1), '월');
+  $('#month-picker').showModal();
+  setWheel($('#mp-y'), ys.indexOf(py)); setWheel($('#mp-m'), pm - 1);
 }
+const wheelIndex = el => Math.min(el.children.length - 1, Math.max(0, Math.round(el.scrollTop / WHEEL_ROW)));
+function setWheel(el, i, smooth) { el.scrollTo({ top: i * WHEEL_ROW, behavior: smooth ? 'smooth' : 'instant' }); markWheel(el, i); }
+function markWheel(el, i = wheelIndex(el)) { [...el.children].forEach((c, j) => c.classList.toggle('on', j === i)); }
+document.querySelectorAll('.wheel').forEach(el => {
+  el.addEventListener('scroll', () => markWheel(el), { passive: true });
+  el.addEventListener('click', ev => { const it = ev.target.closest('.wheel-item'); if (it) setWheel(el, [...el.children].indexOf(it), true); }); // 위아래 칸을 눌러도 이동
+});
 
 // 비교 기준: 보고 있는 달 직전 12개월 중 기록이 있는 달들의 월평균
 function baseline(key) {
@@ -724,9 +734,11 @@ document.addEventListener('click', ev => {
   if (d.detail) { $('#f-detail').value = d.detail; return $('#f-amount').focus(); }
   if (d.add !== undefined) { setAmount(d.add === '0' ? 0 : amountValue() + Number(d.add)); return; }
   if (d.shift) { state.date = addDays($('#f-date').value || today(), Number(d.shift)); return renderForm(); }
-  if (d.pickmonth !== undefined) { state.pickYear = Number(state.period.slice(0, 4)); renderMonthPicker(); return $('#month-picker').showModal(); }
-  if (d.pickyear) { state.pickYear += Number(d.pickyear); return renderMonthPicker(); }
-  if (d.pickperiod) { $('#month-picker').close(); state.period = d.pickperiod; state.calDay = null; return refreshAll(); }
+  if (d.pickmonth !== undefined) return openMonthPicker();
+  if (d.pickok !== undefined) {
+    const y = parseInt($('#mp-y').children[wheelIndex($('#mp-y'))].textContent), m = wheelIndex($('#mp-m')) + 1;
+    $('#month-picker').close(); state.period = `${y}-${String(m).padStart(2, '0')}`; state.calDay = null; return refreshAll();
+  }
   if (d.pshift) { state.period = shiftPeriod(state.period, Number(d.pshift)); state.calDay = null; return refreshAll(); }
   if (d.trendtype) { state.trendType = d.trendtype; state.trendCat = ''; state.trendSel = null; state.trendScrolled = false; return renderTrend(); }
   if (d.trendcat !== undefined) { state.trendCat = d.trendcat; return renderTrend(); }
