@@ -92,11 +92,13 @@ function renderForm() {
   renderDayList();
 }
 
+// 전체 기간 기록에서 이 카테고리 상세내역의 사용 횟수가 많은 순
 function renderSuggest() {
   const freq = new Map();
   for (const e of state.entries) {
-    if (e.type !== state.type || e.category !== state.category || !e.detail) continue;
-    freq.set(e.detail, (freq.get(e.detail) || 0) + 1);
+    const detail = (e.detail || '').trim();
+    if (e.type !== state.type || e.category !== state.category || !detail) continue;
+    freq.set(detail, (freq.get(detail) || 0) + 1);
   }
   const top = [...freq].sort((a, b) => b[1] - a[1]).slice(0, 8).map(x => x[0]);
   $('#suggest').innerHTML = top.map(d => `<button class="chip sm" data-detail="${esc(d)}">${esc(d)}</button>`).join('');
