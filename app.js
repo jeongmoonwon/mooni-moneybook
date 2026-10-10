@@ -285,7 +285,7 @@ function budgetHtml(exp) {
     : `<div><p class="label">쓴 돈</p><div class="hero num">${won(spent)}</div></div>`;
 
   const W = 320, H = 170, L = 8, T = 18, B = 24;
-  const max = Math.max(budget, spent, proj, 1) * 1.08;
+  const max = Math.max(budget, spent, 1) * 1.08; // 월말 예상은 그래프에 안 그리니 높이 계산에서 빼서, 예산선이 위쪽에 오게
   const X = i => L + (W - L * 2) * (days > 1 ? i / (days - 1) : 0.5), Y = v => T + (H - T - B) * (1 - v / max);
   let g = `<line class="axis-l" x1="0" x2="${W}" y1="${Y(0)}" y2="${Y(0)}"/>`;
   if (budget) g += `<line class="bud-l" x1="0" x2="${W}" y1="${Y(budget)}" y2="${Y(budget)}"/>
