@@ -93,13 +93,17 @@
     <div class="period" data-period-nav></div>
     <div class="card" id="summary"></div>
     <div class="card">
+      <div class="card-head" style="margin:0 0 12px"><h2 style="margin:0">저축 · 투자</h2><span class="save-head" id="save-head"></span></div>
+      <div class="tiles" id="save-tiles"></div>
+      <div class="bars" id="save-bars" style="margin-top:14px"></div>
+    </div>
+    <div class="card">
       <h2>달력</h2>
       <div class="cal" id="cal"></div>
       <div class="cal-legend" id="cal-legend"></div>
       <div id="cal-list"></div>
     </div>
     <div class="card"><h2>지출 카테고리</h2><div class="bars" id="cat-bars"></div></div>
-    <div class="card"><h2>저축 · 투자</h2><div class="bars" id="save-bars"></div></div>
   </section>
 
   <!-- 내역 -->
@@ -198,6 +202,14 @@
   </div>
   <p class="note">이름을 누르면 바로 바꿀 수 있어요. 바꾼 이름은 예전 기록에도 적용돼요.</p>
   <div class="actions"><button class="btn ghost" data-close>닫기</button></div>
+</div></dialog>
+
+<!-- 예산 -->
+<dialog id="budget-editor"><div class="body">
+  <h2 id="b-title">예산</h2>
+  <input class="input amount num" id="b-amount" inputmode="numeric" placeholder="0" autocomplete="off">
+  <p class="note">지출만 예산에 들어가요. 다음 달은 이 금액으로 시작하고, 달마다 바꿀 수 있어요.</p>
+  <div class="actions"><button class="btn ghost" data-close>취소</button><button class="btn primary" data-budgetok>저장</button></div>
 </div></dialog>
 
 <!-- 달 고르기 -->

@@ -108,10 +108,40 @@ button.title:active{background:var(--wash)}
 .wheel-item{height:44px;line-height:44px;text-align:center;scroll-snap-align:center;font-size:17px;color:var(--mu);cursor:pointer;font-variant-numeric:tabular-nums}
 .wheel-item.on{color:var(--t-strong);font-weight:700;font-size:19px}
 .hero{font-size:30px;font-weight:800;letter-spacing:-.02em}
-/* 수입 배분 도넛 */
-.donut{display:flex;justify-content:center;margin:10px 0 14px}
-.donut .d-top{font-size:11px;fill:var(--mu)}
-.donut .d-val{font-size:14px;font-weight:700;fill:var(--t1);font-variant-numeric:tabular-nums}
+/* 예산: 남은 예산 + 누적 지출 그래프 */
+.bud-edit{font-weight:700;color:var(--t-strong)}
+.bud-top{display:flex;justify-content:space-between;align-items:flex-end;margin-top:10px}
+.bud-top .label{margin:0 0 2px}
+.bud-side{text-align:right}
+.bud-side b{font-size:17px}
+.bud-chart{display:block;width:100%;height:auto;margin-top:12px}
+.bud-chart text{font-size:10px;fill:var(--mu);font-variant-numeric:tabular-nums}
+.bud-chart .axis-l{stroke:var(--grid)}
+.bud-chart .bud-l{stroke:var(--up);stroke-dasharray:4 4}
+.bud-chart .bud-t{fill:var(--up)}
+.bud-chart .pace-l{stroke:var(--base);stroke-width:2;stroke-dasharray:5 4}
+.bud-chart .cum-a{fill:color-mix(in srgb,var(--s1) 14%,transparent)}
+.bud-chart .cum-l{fill:none;stroke:var(--s1);stroke-width:2.5;stroke-linejoin:round}
+.bud-chart .cum-d{fill:var(--s1);stroke:var(--card);stroke-width:2}
+.bud-chart .cum-t{font-size:11px;font-weight:700;fill:var(--t1)}
+.bud-chart .today-t{fill:var(--t2);font-weight:700}
+.bud-legend{display:flex;gap:14px;font-size:11px;color:var(--mu);margin-top:4px}
+.bud-legend i{display:inline-block;width:14px;height:0;border-top:2.5px solid var(--s1);vertical-align:middle;margin-right:4px}
+.bud-legend .k-pace{border-top:2px dashed var(--base)}
+.bud-legend .k-bud{border-top:1.5px dashed var(--up)}
+.bud-note{margin:12px 0 0;font-size:13px;font-weight:600;border-radius:12px;padding:9px 12px;background:var(--wash);color:var(--t2)}
+.bud-note.bad{background:color-mix(in srgb,var(--bad) 10%,transparent);color:var(--bad)}
+.bud-note.good{color:var(--t-strong)}
+/* 저축 · 투자 */
+.save-head{font-size:12px;color:var(--mu);display:flex;align-items:baseline;gap:6px}
+.save-head b{color:var(--t1);font-size:13px}
+.save-head .chg{min-width:0}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{border-radius:16px;padding:12px;background:var(--wash)}
+.tile .t{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--t2);font-weight:700}
+.tile .sw{width:9px;height:9px;border-radius:50%}
+.tile b{display:block;font-size:19px;margin:4px 0 2px}
+.tile .chg{display:block;text-align:left;min-width:0}
 .card-head{display:flex;align-items:center;justify-content:space-between;margin:-6px -6px 0 0}
 .card-head .label{margin:0}
 .info-btn{color:var(--mu)}
@@ -119,12 +149,7 @@ button.title:active{background:var(--wash)}
 .info-box{background:var(--wash);border-radius:14px;padding:10px 12px;margin:8px 0 4px;font-size:12px;color:var(--t2)}
 .info-box p{margin:0}
 .info-box p+p{margin-top:4px}
-.legend{display:grid;grid-template-columns:auto 1fr auto auto auto;gap:6px 10px;align-items:center;font-size:14px}
-.legend .sw{width:10px;height:10px;border-radius:3px}
-.legend .pct{color:var(--mu);font-size:12px;text-align:right;min-width:40px}
 .over{color:var(--bad)}
-.sw-over{width:14px;height:14px;border-radius:50%;background:var(--bad);color:#fff;font-size:10px;font-weight:800;line-height:14px;text-align:center}
-.over-note{margin:-6px 0 12px;text-align:center;font-size:13px;font-weight:700;color:var(--bad)}
 .note{font-size:12px;color:var(--mu);margin-top:10px}
 
 .bars{display:grid;gap:10px}

@@ -225,41 +225,30 @@ function renderMonth() {
   const list = periodEntries(state.period);
   state.base = baseline(state.period);
   const byType = sumBy(list, e => e.type);
-  const income = byType.get('수입') || 0;
-  const parts = ['지출', '저축', '투자'].map(t => ({ t, v: byType.get(t) || 0 }));
-  const out = parts.reduce((s, p) => s + p.v, 0);
-  const rest = income - out;
-  const pct = v => income ? Math.round(v / income * 100) + '%' : '';
-
-  // 도넛: 수입이 있으면 수입을 100%로 (남은 돈은 회색), 없거나 초과하면 쓴 돈 합계를 100%로
-  const slices = parts.map((p, i) => ({ label: p.t, v: p.v, color: `var(--s${i + 1})` }));
-  if (rest > 0) slices.push({ label: '남은 돈', v: rest, color: 'var(--rest)' });
-  const center = income && rest >= 0 ? ['남은 돈', won(rest)] : income ? ['초과', '−' + won(-rest)] : ['쓴 돈', won(out)];
-
-  const rows = parts.map((p, i) => `<span class="sw" style="background:var(--s${i + 1})"></span><span>${p.t}</span>
-      <b class="num">${won(p.v)}</b><span class="pct num">${pct(p.v)}</span>${chg(p.v, p.t)}`).join('');
-  const restRow = income
-    ? `${rest >= 0 ? '<span class="sw" style="background:var(--rest)"></span>' : '<span class="sw-over" aria-hidden="true">!</span>'}<span>${rest >= 0 ? '남은 돈' : '초과'}</span>
-       <b class="num ${rest < 0 ? 'over' : ''}">${rest < 0 ? '−' : ''}${won(Math.abs(rest))}</b><span class="pct num">${pct(Math.abs(rest))}</span><span></span>`
-    : '';
   const notes = [
+    '예산은 지출만 계산해요. 저축·투자는 아래 카드에 따로 보여줘요.',
+    '예산을 정하지 않은 달은 직전에 정한 달의 예산을 그대로 써요.',
     state.base.n ? `▲▼ 최근 1년(${state.base.n}개월) 월평균 대비예요. <span class="up">▲ 늘어남</span> · <span class="down">▼ 줄어듦</span>` : '▲▼ 비교할 최근 1년 기록이 아직 없어요.',
-    state.period === periodOfDate(today()) ? '이번 달은 아직 진행 중이라, 지금까지 쓴 금액으로 비교해요.' : '',
-    income ? '' : '이 기간에는 수입 기록이 없어서 비율(%) 대신 금액만 보여줘요.',
     '수입·지출 모두 실제 날짜가 이 기간 안에 있는 기록만 계산해요.',
-  ].filter(Boolean);
+  ];
   $('#summary').innerHTML = `
     <div class="card-head">
-      <p class="label">이번 달 수입</p>
-      <button class="icon-btn info-btn" id="info" aria-label="계산 기준 보기" aria-expanded="${state.info}">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="7.8" r=".6" fill="currentColor"/></svg>
-      </button>
+      <h2 style="margin:0">${state.period === periodOfDate(today()) ? '이번 달 ' : ''}예산</h2>
+      <div style="display:flex;align-items:center;gap:4px">
+        <button class="chip sm bud-edit" data-budget>${budgetOf(state.period).v ? `예산 ${won(budgetOf(state.period).v)} ✎` : '예산 정하기'}</button>
+        <button class="icon-btn info-btn" id="info" aria-label="계산 기준 보기" aria-expanded="${state.info}">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="7.8" r=".6" fill="currentColor"/></svg>
+        </button>
+      </div>
     </div>
     ${state.info ? `<div class="info-box">${notes.map(n => `<p>${n}</p>`).join('')}</div>` : ''}
-    <div class="hero-row"><div class="hero num">${won(income)}</div>${chg(income, '수입')}</div>
-    ${donutSvg(slices, center)}
-    ${income && rest < 0 ? `<p class="over-note">수입보다 ${pct(-rest)} 더 썼어요</p>` : ''}
-    <div class="legend">${rows}${restRow}</div>`;
+    ${budgetHtml(list.filter(e => e.type === '지출'))}`;
+
+  const income = byType.get('수입') || 0;
+  $('#save-head').innerHTML = `수입 <b class="num">${won(income)}</b> ${chg(income, '수입')}`;
+  $('#save-tiles').innerHTML = ['저축', '투자'].map((t, i) => `<div class="tile">
+      <div class="t"><span class="sw" style="background:var(--s${i + 2})"></span>${t}</div>
+      <b class="num">${won(byType.get(t) || 0)}</b>${chg(byType.get(t) || 0, t)}</div>`).join('');
 
   const exp = list.filter(e => e.type === '지출');
   $('#cat-bars').innerHTML = barsHtml(sumBy(exp, e => e.category), 'var(--s1)', '지출');
@@ -269,25 +258,74 @@ function renderMonth() {
   renderCalendar();
 }
 
-// 가운데가 빈 원형 차트. 조각 사이에 2px 틈을 두어 색이 붙어 보이지 않게 한다.
-function donutSvg(slices, [top, bottom]) {
-  const R = 58, W = 18, C = 2 * Math.PI * R, GAP = 2;
-  const total = slices.reduce((s, x) => s + x.v, 0);
-  const shown = slices.filter(x => x.v > 0);
-  let off = 0;
-  const arcs = total ? shown.map(x => {
-    const len = x.v / total * C;
-    const dash = shown.length > 1 ? Math.max(len - GAP, 0.5) : len;
-    const arc = `<circle r="${R}" cx="70" cy="70" fill="none" stroke="${x.color}" stroke-width="${W}"
-      stroke-dasharray="${dash} ${C - dash}" stroke-dashoffset="${-off}"><title>${esc(x.label)} ${won(x.v)} (${Math.round(x.v / total * 100)}%)</title></circle>`;
-    off += len;
-    return arc;
-  }).join('') : '';
-  return `<div class="donut"><svg viewBox="0 0 140 140" width="148" height="148" role="img" aria-label="수입 배분">
-    <circle r="${R}" cx="70" cy="70" fill="none" stroke="var(--grid)" stroke-width="${W}"/>
-    <g transform="rotate(-90 70 70)">${arcs}</g>
-    <text x="70" y="64" text-anchor="middle" class="d-top">${esc(top)}</text>
-    <text x="70" y="84" text-anchor="middle" class="d-val">${esc(bottom)}</text></svg></div>`;
+// 예산: 달마다 정하고, 정하지 않은 달은 직전에 정한 달의 예산을 그대로 쓴다
+function budgetOf(key) {
+  const b = state.settings.budgets || {};
+  if (b[key]) return { v: b[key], own: true };
+  const prev = Object.keys(b).filter(k => k < key && b[k]).sort().at(-1);
+  return { v: prev ? b[prev] : 0, own: false };
+}
+
+// 예산 카드: 남은 예산 + 날짜별 누적 지출 선 vs 예산을 고르게 쓸 때의 선. 이번 달이면 이 속도로 월말에 얼마가 될지 예상
+function budgetHtml(exp) {
+  const { start, end } = periodRange(state.period), t = today();
+  const days = Math.round((parse(end) - parse(start)) / 864e5) + 1;
+  const now = t < start ? -1 : t > end ? days - 1 : Math.round((parse(t) - parse(start)) / 864e5); // 선을 그릴 마지막 날
+  const live = t >= start && t <= end;
+  const budget = budgetOf(state.period).v;
+  const byDay = sumBy(exp, e => e.date), cum = [];
+  for (let i = 0, c = 0; i <= now; i++) { c += byDay.get(addDays(start, i)) || 0; cum.push(c); }
+  const spent = exp.reduce((s, e) => s + e.amount, 0), rest = budget - spent;
+  const proj = live && now >= 2 ? spent / (now + 1) * days : 0; // 3일은 지나야 예상
+
+  const top = budget
+    ? `<div><p class="label">${rest >= 0 ? '남은 예산' : '예산 초과'}</p><div class="hero num ${rest < 0 ? 'over' : ''}">${rest < 0 ? '−' : ''}${won(Math.abs(rest))}</div></div>
+       ${live ? `<div class="bud-side"><p class="label">하루에</p><b class="num">${won(Math.max(rest, 0) / (days - now))}</b></div>`
+              : `<div class="bud-side"><p class="label">쓴 돈</p><b class="num">${won(spent)}</b></div>`}`
+    : `<div><p class="label">쓴 돈</p><div class="hero num">${won(spent)}</div></div>`;
+
+  const W = 320, H = 170, L = 8, T = 18, B = 24;
+  const max = Math.max(budget, spent, proj, 1) * 1.08;
+  const X = i => L + (W - L * 2) * (days > 1 ? i / (days - 1) : 0.5), Y = v => T + (H - T - B) * (1 - v / max);
+  let g = `<line class="axis-l" x1="0" x2="${W}" y1="${Y(0)}" y2="${Y(0)}"/>`;
+  if (budget) g += `<line class="bud-l" x1="0" x2="${W}" y1="${Y(budget)}" y2="${Y(budget)}"/>
+    <text class="bud-t" x="${W - 2}" y="${Y(budget) - 5}" text-anchor="end">예산 ${compact(budget)}</text>
+    <line class="pace-l" x1="${X(0)}" y1="${Y(0)}" x2="${X(days - 1)}" y2="${Y(budget)}"/>`;
+  if (cum.length) {
+    const pts = cum.map((v, i) => `${X(i)},${Y(v)}`).join(' '), lx = X(now), ly = Y(spent);
+    g += `<polygon class="cum-a" points="${X(0)},${Y(0)} ${pts} ${lx},${Y(0)}"/><polyline class="cum-l" points="${pts}"/>
+      <circle class="cum-d" cx="${lx}" cy="${ly}" r="4.5"/>
+      <text class="cum-t" x="${Math.min(Math.max(lx, 20), W - 20)}" y="${ly - 9}" text-anchor="middle">${compact(spent)}</text>`;
+  }
+  g += `<text x="${X(0)}" y="${H - 6}">${md(start)}</text><text x="${X(days - 1)}" y="${H - 6}" text-anchor="end">${md(end)}</text>`;
+  if (live && now > 2 && now < days - 3) g += `<text class="today-t" x="${X(now)}" y="${H - 6}" text-anchor="middle">오늘</text>`;
+
+  let note = '';
+  if (budget && live && proj) note = proj > budget
+    ? `<p class="bud-note bad">이 속도면 월말에 약 ${compact(proj)}원 · ${compact(proj - budget)}원 초과 예상</p>`
+    : `<p class="bud-note good">이 속도면 월말에 약 ${compact(proj)}원 · 예산 안이에요</p>`;
+  else if (budget && t > end) note = rest < 0
+    ? `<p class="bud-note bad">예산보다 ${won(-rest)} 더 썼어요</p>`
+    : `<p class="bud-note good">예산보다 ${won(rest)} 덜 썼어요</p>`;
+  else if (!budget) note = '<p class="bud-note">예산을 정하면 남은 돈과 하루에 쓸 수 있는 돈을 알려줘요</p>';
+
+  return `<div class="bud-top">${top}</div>
+    <svg class="bud-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="날짜별 누적 지출">${g}</svg>
+    <div class="bud-legend"><span><i class="k-cum"></i>쓴 돈(누적)</span>${budget ? '<span><i class="k-pace"></i>고르게 쓸 때</span><span><i class="k-bud"></i>예산</span>' : ''}</div>
+    ${note}`;
+}
+
+function openBudget() {
+  const [y, m] = state.period.split('-').map(Number), v = budgetOf(state.period).v;
+  $('#b-title').textContent = `${y}년 ${m}월 예산`;
+  $('#b-amount').value = v ? v.toLocaleString('ko-KR') : '';
+  $('#budget-editor').showModal(); $('#b-amount').focus();
+}
+function saveBudget() {
+  const v = Number($('#b-amount').value.replace(/[^\d]/g, ''));
+  if (!v) { toast('예산을 입력해 주세요'); return $('#b-amount').focus(); }
+  $('#budget-editor').close();
+  store.saveSettings({ budgets: { ...state.settings.budgets, [state.period]: v } }).catch(err => toast('예산 저장 실패: ' + errMsg(err)));
 }
 
 function barsHtml(map, color, type) {
@@ -735,6 +773,8 @@ document.addEventListener('click', ev => {
   if (d.add !== undefined) { setAmount(d.add === '0' ? 0 : amountValue() + Number(d.add)); return; }
   if (d.shift) { state.date = addDays($('#f-date').value || today(), Number(d.shift)); return renderForm(); }
   if (d.pickmonth !== undefined) return openMonthPicker();
+  if (d.budget !== undefined) return openBudget();
+  if (d.budgetok !== undefined) return saveBudget();
   if (d.pickok !== undefined) {
     const y = parseInt($('#mp-y').children[wheelIndex($('#mp-y'))].textContent), m = wheelIndex($('#mp-m')) + 1;
     $('#month-picker').close(); state.period = `${y}-${String(m).padStart(2, '0')}`; state.calDay = null; return refreshAll();
@@ -769,6 +809,8 @@ document.addEventListener('click', ev => {
 });
 $('#f-date').addEventListener('change', e => { state.date = e.target.value || today(); renderDayList(); });
 $('#f-amount').addEventListener('input', () => setAmount(amountValue()));
+$('#b-amount').addEventListener('input', e => { const n = Number(e.target.value.replace(/[^\d]/g, '')); e.target.value = n ? n.toLocaleString('ko-KR') : ''; });
+$('#b-amount').addEventListener('keydown', e => { if (e.key === 'Enter') saveBudget(); });
 $('#f-amount').addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
 $('#flt-type').addEventListener('change', e => { state.fltType = e.target.value; renderList(); });
 $('#flt-cat').addEventListener('change', e => { state.fltCat = e.target.value; renderList(); });
