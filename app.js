@@ -170,9 +170,19 @@ function renderPeriodNav() {
   const r = periodRange(state.period);
   const [y, m] = state.period.split('-').map(Number);
   const html = `<button class="step" data-pshift="-1" aria-label="이전 달">‹</button>
-    <div class="title"><b>${y}년 ${m}월</b><span>${md(r.start)} ~ ${md(r.end)}</span></div>
+    <button class="title" data-pickmonth aria-label="달 고르기"><b>${y}년 ${m}월 <i>▾</i></b><span>${md(r.start)} ~ ${md(r.end)}</span></button>
     <button class="step" data-pshift="1" aria-label="다음 달">›</button>`;
   document.querySelectorAll('[data-period-nav]').forEach(el => el.innerHTML = html);
+}
+
+// 달 고르기 창: 연도를 넘기며 12달 중 하나를 누르면 그 달로 이동. 기록이 없는 달은 흐리게
+function renderMonthPicker() {
+  const y = state.pickYear, has = new Set(state.entries.map(periodOf)), now = periodOfDate(today());
+  $('#mp-year').textContent = `${y}년`;
+  $('#mp-grid').innerHTML = Array.from({ length: 12 }, (_, i) => {
+    const k = `${y}-${String(i + 1).padStart(2, '0')}`;
+    return `<button class="chip${has.has(k) ? '' : ' mp-empty'}${k === now ? ' mp-now' : ''}" data-pickperiod="${k}" aria-pressed="${k === state.period}">${i + 1}월</button>`;
+  }).join('');
 }
 
 // 비교 기준: 보고 있는 달 직전 12개월 중 기록이 있는 달들의 월평균
@@ -699,6 +709,7 @@ async function importCsv(file) {
 
 /* ================= 이벤트 ================= */
 addEventListener('resize', () => { if (state.view === 'trend') renderTrend(); }); // 화면 폭이 바뀌면 그래프 폭도 다시 맞춤
+$('#month-picker').addEventListener('click', ev => { if (ev.target === ev.currentTarget) ev.currentTarget.close(); }); // 바깥 누르면 닫기
 $('#trend-chart').addEventListener('click', ev => {
   const r = ev.target.closest('[data-tm]'); if (!r) return;
   state.trendSel = state.trendSel === r.dataset.tm ? null : r.dataset.tm;
@@ -713,6 +724,9 @@ document.addEventListener('click', ev => {
   if (d.detail) { $('#f-detail').value = d.detail; return $('#f-amount').focus(); }
   if (d.add !== undefined) { setAmount(d.add === '0' ? 0 : amountValue() + Number(d.add)); return; }
   if (d.shift) { state.date = addDays($('#f-date').value || today(), Number(d.shift)); return renderForm(); }
+  if (d.pickmonth !== undefined) { state.pickYear = Number(state.period.slice(0, 4)); renderMonthPicker(); return $('#month-picker').showModal(); }
+  if (d.pickyear) { state.pickYear += Number(d.pickyear); return renderMonthPicker(); }
+  if (d.pickperiod) { $('#month-picker').close(); state.period = d.pickperiod; state.calDay = null; return refreshAll(); }
   if (d.pshift) { state.period = shiftPeriod(state.period, Number(d.pshift)); state.calDay = null; return refreshAll(); }
   if (d.trendtype) { state.trendType = d.trendtype; state.trendCat = ''; state.trendSel = null; state.trendScrolled = false; return renderTrend(); }
   if (d.trendcat !== undefined) { state.trendCat = d.trendcat; return renderTrend(); }

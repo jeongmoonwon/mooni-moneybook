@@ -200,6 +200,17 @@
   <div class="actions"><button class="btn ghost" data-close>닫기</button></div>
 </div></dialog>
 
+<!-- 달 고르기 -->
+<dialog id="month-picker"><div class="body">
+  <div class="period" style="margin-bottom:14px">
+    <button class="step" data-pickyear="-1" aria-label="이전 해">‹</button>
+    <div class="title"><b id="mp-year"></b></div>
+    <button class="step" data-pickyear="1" aria-label="다음 해">›</button>
+  </div>
+  <div class="mp-grid" id="mp-grid"></div>
+  <div class="actions"><button class="btn ghost" data-close>닫기</button></div>
+</div></dialog>
+
 <div id="toast" role="status"></div>
 
 <script src="firebase-config.js"></script>
