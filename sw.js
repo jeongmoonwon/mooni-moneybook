@@ -10,7 +10,7 @@ self.addEventListener('fetch', e => {
   const mine = url.origin === location.origin || url.host === 'www.gstatic.com'; // 앱 파일 + Firebase 라이브러리
   if (e.request.method !== 'GET' || !mine) return;
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request, { cache: 'no-cache' }) // 브라우저 캐시(깃허브 페이지는 10분)를 건너뛰고 서버에 바뀌었는지 꼭 확인
       .then(res => {
         if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); }
         return res;

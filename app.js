@@ -188,7 +188,7 @@ function openMonthPicker() {
   setWheel($('#mp-y'), ys.indexOf(py)); setWheel($('#mp-m'), pm - 1);
 }
 const wheelIndex = el => Math.min(el.children.length - 1, Math.max(0, Math.round(el.scrollTop / WHEEL_ROW)));
-function setWheel(el, i, smooth) { el.scrollTo({ top: i * WHEEL_ROW, behavior: smooth ? 'smooth' : 'instant' }); markWheel(el, i); }
+function setWheel(el, i, smooth) { if (smooth) el.scrollTo({ top: i * WHEEL_ROW, behavior: 'smooth' }); else el.scrollTop = i * WHEEL_ROW; markWheel(el, i); }
 function markWheel(el, i = wheelIndex(el)) { [...el.children].forEach((c, j) => c.classList.toggle('on', j === i)); }
 document.querySelectorAll('.wheel').forEach(el => {
   el.addEventListener('scroll', () => markWheel(el), { passive: true });
