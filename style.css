@@ -61,6 +61,9 @@ header h1{font-size:18px;margin:0;flex:1;letter-spacing:-.01em;display:flex;alig
 .chip[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--on-ink);font-weight:700}
 .chips .chip.sm:not([aria-pressed]){background:var(--wash);border-color:transparent}
 .chip.sm{padding:4px 10px;font-size:13px}
+.chips.scroll{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-inline:-16px;padding-inline:16px}
+.chips.scroll::-webkit-scrollbar{display:none}
+.chips.scroll .chip{flex:none}
 .quick{display:flex;gap:6px;margin-top:8px}
 .quick .chip{flex:1}
 

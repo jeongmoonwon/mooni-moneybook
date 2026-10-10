@@ -57,7 +57,7 @@ let store = null;
 const state = {
   user: null, entries: [], settings: { payday: 25 }, pending: false,
   view: 'add', type: '지출', category: '식비', date: today(), editing: null,
-  period: null, calDay: null, trendType: '지출', fltType: '', fltCat: '', q: '', visible: [],
+  period: null, calDay: null, trendType: '지출', trendCat: '', fltType: '', fltCat: '', q: '', visible: [],
   info: false, ceType: '지출', ceDelete: null,
 };
 function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
@@ -381,12 +381,17 @@ function renderList() {
 /* ================= 추이 탭 ================= */
 const PEAK_RATIO = 1.5; // 평소(직전 12개월 월 지출의 중간값)의 1.5배 이상이면 피크
 
-// 첫 기록이 있는 달부터 이번 달까지, 월(월급일 기준)별 합계와 평소 수준 (type: 지출 또는 수입)
-function monthlyTotals(type) {
-  const sums = new Map();
-  for (const e of state.entries) if (e.type === type) sums.set(periodOf(e), (sums.get(periodOf(e)) || 0) + e.amount);
+// 첫 기록이 있는 달부터 이번 달까지, 월(월급일 기준)별 합계와 평소 수준 (type: 지출 또는 수입, cat: 비우면 전체)
+// 카테고리를 골라도 기간은 그 type 전체 기록 기준이라, 카테고리를 바꿔도 가로축이 그대로예요
+function monthlyTotals(type, cat = '') {
+  const sums = new Map(), seen = new Set();
+  for (const e of state.entries) {
+    if (e.type !== type) continue;
+    seen.add(periodOf(e));
+    if (!cat || e.category === cat) sums.set(periodOf(e), (sums.get(periodOf(e)) || 0) + e.amount);
+  }
   if (!sums.size) return [];
-  const keys = [...sums.keys()].sort();
+  const keys = [...seen].sort();
   const last = [keys.at(-1), periodOfDate(today())].sort().at(-1);
   const months = [];
   for (let k = keys[0]; k <= last; k = shiftPeriod(k, 1)) months.push(k);
@@ -398,10 +403,12 @@ function monthlyTotals(type) {
   });
 }
 
+// 세로축 최댓값: 전체 기간 실제 최댓값을 100만원 단위로 올림(100만원 미만이면 10만원 단위). 눈금은 그 최댓값을 5칸 이하로 나누는 간격
 function niceMax(v) {
-  const steps = [10, 20, 50, 100, 200, 500, 1000].map(x => x * 10000);
-  const step = steps.find(st => v / st <= 4) || steps.at(-1);
-  return { max: Math.max(step, Math.ceil(v / step) * step), step };
+  const UNIT = v < 1000000 ? 100000 : 1000000;
+  const max = Math.max(1, Math.ceil(v / UNIT)) * UNIT;
+  const step = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000].map(x => x * 10000).find(st => max % st === 0 && max / st <= 5) || UNIT;
+  return { max, step };
 }
 
 const TREND_TYPES = {
@@ -411,18 +418,22 @@ const TREND_TYPES = {
 
 function renderTrend() {
   const type = state.trendType, cfg = TREND_TYPES[type];
+  if (state.trendCat && !cats(type).includes(state.trendCat)) state.trendCat = '';
+  const cat = state.trendCat;
   $('#trend-seg').innerHTML = Object.keys(TREND_TYPES).map(t => `<button data-trendtype="${t}" aria-pressed="${t === type}">${t}</button>`).join('');
-  $('#trend-title').textContent = `월별 ${type}`;
+  $('#trend-cats').innerHTML = ['', ...cats(type)].map(c =>
+    `<button class="chip" data-trendcat="${esc(c)}" aria-pressed="${c === cat}">${c ? esc(c) : '전체'}</button>`).join('');
+  $('#trend-title').textContent = `월별 ${type}${cat ? ' · ' + cat : ''}`;
   $('#trend-leg-name').textContent = type;
   const view = $('#view-trend');
   view.style.setProperty('--series', cfg.color); view.style.setProperty('--peak', cfg.peak);
-  const data = monthlyTotals(type);
+  const data = monthlyTotals(type, cat);
   const H = 236, T = 26, B = 34, COL = 44, PAD = 18;
   const ph = H - T - B;
   if (!data.length) {
     $('#trend-sub').textContent = '';
     $('#trend-axis').innerHTML = ''; $('#trend-chart').innerHTML = '';
-    $('#trend-detail').innerHTML = `<p class="empty">${type} 기록이 쌓이면 그래프가 그려져요</p>`;
+    $('#trend-detail').innerHTML = `<p class="empty">${cat ? '이 카테고리' : type} 기록이 쌓이면 그래프가 그려져요</p>`;
     return;
   }
   const { max, step } = niceMax(Math.max(...data.map(d => Math.max(d.v, d.base))));
@@ -438,7 +449,7 @@ function renderTrend() {
 
   const svg = $('#trend-chart');
   svg.setAttribute('width', W); svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-  svg.setAttribute('aria-label', `월별 ${type} 그래프, 피크 ${peaks}번`);
+  svg.setAttribute('aria-label', `월별 ${type}${cat ? ' ' + cat : ''} 그래프, 피크 ${peaks}번`);
   const line = data.map((d, i) => `${X(i)},${Y(d.v)}`).join(' ');
   const baseSegs = data.map((d, i) => d.base ? `${X(i)},${Y(d.base)}` : null);
   const basePath = baseSegs.reduce((acc, p, i) => acc + (p ? `${i && baseSegs[i - 1] ? 'L' : 'M'}${p}` : ''), '');
@@ -480,8 +491,10 @@ function renderTrendDetail(d) {
     box.innerHTML = `<p class="empty" style="padding:6px 0">그래프의 점을 누르면 그 달을 자세히 볼 수 있어요<br>동그라미는 평소보다 1.5배 넘게 ${cfg.verb} 달이에요</p>`;
     return;
   }
-  const r = periodRange(d.k), [y, m] = d.k.split('-').map(Number);
-  const top = state.entries.filter(e => e.type === state.trendType && periodOf(e) === d.k).sort((a, b) => b.amount - a.amount).slice(0, 3);
+  const r = periodRange(d.k), [y, m] = d.k.split('-').map(Number), cat = state.trendCat;
+  const inMonth = state.entries.filter(e => e.type === state.trendType && periodOf(e) === d.k);
+  const top = inMonth.filter(e => !cat || e.category === cat).sort((a, b) => b.amount - a.amount).slice(0, 3);
+  const total = inMonth.reduce((s, e) => s + e.amount, 0);
   const diff = d.base ? Math.round((d.v - d.base) / d.base * 100) : null;
   box.innerHTML = `
     <div class="td-top">
@@ -490,7 +503,8 @@ function renderTrendDetail(d) {
       <button class="chip" data-gomonth="${d.k}">이 달 보기</button>
     </div>
     <p class="td-cmp">${d.base && !diff ? `평소(${won(d.base)})와 같아요` : d.base ? `평소 ${won(d.base)}보다 <b class="${diff > 0 ? 'chg up' : 'chg down'}" style="font-size:13px">${diff > 0 ? '▲' : '▼'}${Math.abs(diff)}%</b>` : '평소와 비교하려면 3개월 이상 기록이 필요해요'}</p>
-    ${top.length ? `<p class="label">${TREND_TYPES[state.trendType].top}</p><ul class="list">${top.map(itemHtml).join('')}</ul>` : ''}`;
+    ${cat && total ? `<p class="td-cmp">이 달 ${state.trendType}의 ${Math.round(d.v / total * 100)}%</p>` : ''}
+    ${top.length ? `<p class="label">${TREND_TYPES[state.trendType].top}${cat ? ` (${esc(cat)})` : ''}</p><ul class="list">${top.map(itemHtml).join('')}</ul>` : ''}`;
 }
 
 /* ================= 화면 전환 ================= */
@@ -696,7 +710,8 @@ document.addEventListener('click', ev => {
   if (d.add !== undefined) { setAmount(d.add === '0' ? 0 : amountValue() + Number(d.add)); return; }
   if (d.shift) { state.date = addDays($('#f-date').value || today(), Number(d.shift)); return renderForm(); }
   if (d.pshift) { state.period = shiftPeriod(state.period, Number(d.pshift)); state.calDay = null; return refreshAll(); }
-  if (d.trendtype) { state.trendType = d.trendtype; state.trendSel = null; state.trendScrolled = false; return renderTrend(); }
+  if (d.trendtype) { state.trendType = d.trendtype; state.trendCat = ''; state.trendSel = null; state.trendScrolled = false; return renderTrend(); }
+  if (d.trendcat !== undefined) { state.trendCat = d.trendcat; return renderTrend(); }
   if (d.addday) return addOnDay(d.addday);
   if (d.gomonth) { state.period = d.gomonth; state.calDay = null; return go('month'); }
   if (d.day) { state.calDay = state.calDay === d.day ? null : d.day; return renderCalendar(); }
