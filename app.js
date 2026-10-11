@@ -433,9 +433,6 @@ function renderMonth() {
     <div class="card-head">
       <h2 style="margin:0">${state.period === periodOfDate(today()) ? '이번 달 ' : ''}예산</h2>
       <div style="display:flex;align-items:center;gap:4px">
-        ${state.budEdit && state.budEdit.key === state.period
-          ? '<button class="chip sm" data-budavg>평균으로</button><button class="chip sm" data-budcancel>취소</button><button class="chip sm bud-done" data-budsave>완료</button>'
-          : '<button class="chip sm bud-edit" data-budedit>✎ 예산 조정</button>'}
         <button class="icon-btn info-btn" id="info" aria-label="계산 기준 보기" aria-expanded="${state.info}">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="7.8" r=".6" fill="currentColor"/></svg>
         </button>
@@ -516,22 +513,22 @@ function spendPace(key) {
 }
 
 // 예산 카드: 위에는 총 예산 대비 쓴 돈(막대), 아래에는 카테고리마다 예산 대비 쓴 돈.
-// '예산 조정'을 누르면 카테고리 막대를 손가락으로 밀어서 예산을 정한다 (회색 눈금 = 최근 12개월 평균)
+// 카테고리 막대의 동그란 손잡이를 끌면 바로 예산이 바뀌고 저장된다
 function budgetHtml(exp) {
-  if (state.budEdit && state.budEdit.key !== state.period) state.budEdit = null;
-  const E = state.budEdit, cb = catBudgetsOf(state.period), map = E ? E.map : cb.map;
-  const byCat = sumBy(exp, e => e.category);
-  const shown = E ? cats('지출') : cats('지출').filter(c => map[c] || byCat.get(c))
+  const cb = catBudgetsOf(state.period), map = cb.map, byCat = sumBy(exp, e => e.category);
+  const used = c => map[c] || byCat.get(c);
+  const shown = (state.budAll ? cats('지출') : cats('지출').filter(used))
     .sort((a, b) => (map[b] || 0) - (map[a] || 0) || (byCat.get(b) || 0) - (byCat.get(a) || 0));
-  const M = E ? E.M : budScale(map, byCat, cb.avg);
-  state.budCtx = { byCat, avg: cb.avg, M, spent: exp.reduce((s, e) => s + e.amount, 0) };
+  const hidden = cats('지출').filter(c => !used(c)).length;
+  state.budCtx = { byCat, avg: cb.avg, M: budScale(map, byCat), spent: exp.reduce((s, e) => s + e.amount, 0) };
   return `<div id="bud-total">${budTotalHtml(map)}</div>
-    ${E ? '<p class="cb-hint">막대를 좌우로 밀어서 예산을 정해요 · 회색 눈금은 최근 12개월 평균</p>' : ''}
-    <div class="cb-list ${E ? 'editing' : ''}">${shown.length ? shown.map(c => cbRowHtml(c, map[c] || 0)).join('')
-      : '<p class="empty">아직 지출 기록이 없어요. \'예산 조정\'을 눌러 카테고리별 예산을 정해 보세요</p>'}</div>`;
+    <div class="cb-list">${shown.map(c => cbRowHtml(c, map[c] || 0)).join('')}</div>
+    <div class="cb-foot">${hidden || state.budAll ? `<button class="chip sm" data-budall>${state.budAll ? '쓰는 카테고리만 보기' : `카테고리 ${hidden}개 더 보기`}</button>` : '<span></span>'}
+      <button class="chip sm" data-budavg>최근 12개월 평균으로 맞추기</button></div>
+    <p class="cb-hint">● 손잡이를 좌우로 끌어서 카테고리 예산을 정해요</p>`;
 }
-function budScale(map, byCat, avg) { // 모든 카테고리 막대가 같은 축을 쓰도록 가장 큰 값 기준
-  return Math.max(50000, ...cats('지출').map(c => Math.max(map[c] || 0, byCat.get(c) || 0, avg[c] || 0))) * 1.15;
+function budScale(map, byCat) { // 모든 카테고리 막대가 같은 축을 쓰도록 가장 큰 값 기준
+  return Math.max(50000, ...cats('지출').map(c => Math.max(map[c] || 0, byCat.get(c) || 0))) * 1.2;
 }
 
 function budTotalHtml(map) {
@@ -542,7 +539,7 @@ function budTotalHtml(map) {
        ${live ? `<div class="bud-side"><p class="label">하루에</p><b class="num">${won(Math.max(rest, 0) / (Math.round((parse(end) - parse(t)) / 864e5) + 1))}</b></div>` : ''}`
     : `<div><p class="label">쓴 돈</p><div class="hero num">${won(spent)}</div></div>`;
   const bar = budget ? `<div class="tb"><div class="tb-track"><i style="width:${Math.min(100, spent / budget * 100)}%" class="${rest < 0 ? 'over' : ''}"></i></div>
-    <div class="tb-lab"><span>쓴 돈 <b class="num">${won(spent)}</b></span><span>총 예산 <b class="num">${won(budget)}</b> · ${Math.round(spent / budget * 100)}%</span></div></div>` : '';
+    <div class="tb-lab"><span>쓴 돈 <b class="num">${won(spent)}</b></span><span>총 예산 <b class="num">${won(budget)}</b></span></div></div>` : '';
 
   // 평소 이맘때(최근 12개월 같은 기간 평균)와 비교한 한 줄. 차이가 3% 안쪽이면 비슷하다고만
   let cmp = '';
@@ -560,65 +557,55 @@ function budTotalHtml(map) {
 }
 
 function cbRowHtml(c, b) {
-  const { byCat, avg, M } = state.budCtx, s = byCat.get(c) || 0, E = state.budEdit;
+  const { byCat, M } = state.budCtx, s = byCat.get(c) || 0;
   const pct = v => `${Math.min(100, v / M * 100)}%`;
-  const pace = state.pace;
-  return `<div class="cb-row" data-cbcat="${esc(c)}"${E ? '' : ` data-jump="지출|${esc(c)}"`}>
-    <div class="cb-head"><span class="cb-name">${esc(c)}</span><span class="cb-amt num">${compact(s)} / <b>${b ? compact(b) : '–'}</b></span></div>
+  return `<div class="cb-row" data-cbcat="${esc(c)}">
+    <div class="cb-head" data-jump="지출|${esc(c)}"><span class="cb-name">${esc(c)}</span><span class="cb-amt num">${compact(s)} / <b>${b ? compact(b) : '–'}</b></span></div>
     <div class="cb-track">
       <i class="cb-fill" style="width:${pct(Math.min(s, b))}"></i>
       ${s > b ? `<i class="cb-over" style="left:${pct(b)};width:${pct(s - b)}"></i>` : ''}
-      ${E && avg[c] ? `<i class="cb-avg" style="left:${pct(avg[c])}"></i>` : ''}
-      ${b || E ? `<i class="cb-knob" style="left:${pct(b)}"></i>` : ''}
+      <button class="cb-knob" style="left:${pct(b)}" aria-label="${esc(c)} 예산 ${won(b)}, 좌우로 끌어서 바꾸기"></button>
     </div>
-    <div class="cb-sub"><span>${b ? (s > b ? `<b class="over">${compact(s - b)}원 초과</b>` : `${compact(b - s)}원 남음`) : '예산 없음'}${E ? ` · 평균 ${avg[c] ? compact(avg[c]) + '원' : '없음'}` : ''}</span>
-      ${E ? '' : chg(s, '지출|' + c, pace, pace && pace.live ? `최근 ${pace.n}개월 같은 기간(${pace.k}일째까지) 평균` : `최근 ${pace ? pace.n : 0}개월 평균`)}</div>
   </div>`;
 }
 
-function startBudEdit() {
-  const cb = catBudgetsOf(state.period);
-  state.budEdit = { key: state.period, map: { ...cb.map } };
-  state.budEdit.M = budScale(state.budEdit.map, sumBy(periodEntries(state.period).filter(e => e.type === '지출'), e => e.category), cb.avg);
-  renderMonth();
-}
-function budToAverage() {
-  const E = state.budEdit; if (!E) return;
-  E.map = { ...catAverages(state.period) };
-  renderMonth();
-}
-function saveBudEdit() {
-  const E = state.budEdit; if (!E) return;
-  state.budEdit = null;
-  state.settings.catBudgets = { ...state.settings.catBudgets, [E.key]: E.map }; // 저장이 돌아오기 전에도 바로 보이게
+function saveCatBudgets(map) {
+  state.settings.catBudgets = { ...state.settings.catBudgets, [state.period]: map }; // 저장이 돌아오기 전에도 바로 보이게
   renderMonth();
   store.saveSettings({ catBudgets: state.settings.catBudgets }).catch(err => toast('예산 저장 실패: ' + errMsg(err)));
-  toast('예산을 저장했어요');
+}
+function budToAverage() {
+  if (!confirm('모든 카테고리 예산을 최근 12개월 평균으로 바꿀까요?')) return;
+  saveCatBudgets({ ...catAverages(state.period) });
+  toast('최근 12개월 평균으로 맞췄어요');
 }
 
-// 예산 조정 중 막대 끌기: 다시 그리지 않고 그 줄과 맨 위 합계만 고쳐서, 손가락을 놓칠 일이 없게
+// 손잡이 끌기: 끄는 동안은 그 줄과 맨 위 합계만 고쳐서 손가락을 놓치지 않게 하고, 놓으면 저장
 function budDragStart(ev) {
-  const E = state.budEdit, tr = ev.target.closest('.cb-list.editing .cb-track'); if (!E || !tr) return;
-  const row = tr.closest('.cb-row'), c = row.dataset.cbcat, step = E.M > 300000 ? 10000 : 5000;
-  ev.preventDefault(); tr.setPointerCapture(ev.pointerId);
-  const set = e => {
+  const knob = ev.target.closest('.cb-knob'); if (!knob) return;
+  const tr = knob.parentElement, row = tr.closest('.cb-row'), c = row.dataset.cbcat;
+  const map = { ...catBudgetsOf(state.period).map }, M = state.budCtx.M, step = M > 300000 ? 10000 : 5000;
+  ev.preventDefault();
+  knob.classList.add('on');
+  let moved = false;
+  const move = e => {
     const r = tr.getBoundingClientRect(), x = Math.min(Math.max(e.clientX - r.left, 0), r.width);
-    const v = Math.round(x / r.width * E.M / step) * step;
-    if (v === E.map[c]) return;
-    E.map[c] = v;
+    const v = Math.round(x / r.width * M / step) * step;
+    if (v === map[c]) return;
+    map[c] = v; moved = true;
     const tmp = document.createElement('div'); tmp.innerHTML = cbRowHtml(c, v);
     row.querySelector('.cb-head').replaceWith(tmp.querySelector('.cb-head'));
-    row.querySelector('.cb-sub').replaceWith(tmp.querySelector('.cb-sub'));
-    tr.innerHTML = tmp.querySelector('.cb-track').innerHTML;
-    $('#bud-total').innerHTML = budTotalHtml(E.map);
+    for (const el of [...tr.children]) if (el !== knob) el.remove(); // 손잡이는 그대로 두고 막대만 새로
+    for (const el of [...tmp.querySelector('.cb-track').children]) if (!el.classList.contains('cb-knob')) tr.insertBefore(el, knob);
+    knob.style.left = `${Math.min(100, v / M * 100)}%`;
+    $('#bud-total').innerHTML = budTotalHtml(map);
   };
-  set(ev);
-  const move = e => set(e);
-  const up = () => {
-    ['pointermove', 'pointerup', 'pointercancel'].forEach((t, i) => tr.removeEventListener(t, i ? up : move));
-    if (E.map[c] > E.M * 0.9) { E.M = E.map[c] * 1.4; renderMonth(); } // 끝까지 밀면 축을 늘려서 더 올릴 수 있게
+  const up = () => { // 손가락이 손잡이 밖으로 나가도 따라가도록 화면 전체에서 듣는다
+    removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
+    knob.classList.remove('on');
+    if (moved) saveCatBudgets(map);
   };
-  tr.addEventListener('pointermove', move); tr.addEventListener('pointerup', up); tr.addEventListener('pointercancel', up);
+  addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', up);
 }
 
 function barsHtml(map, color, type, base, label) {
@@ -1083,7 +1070,7 @@ $('#trend-chart').addEventListener('click', ev => {
   renderTrend();
 });
 document.addEventListener('click', ev => {
-  const b = ev.target.closest('button, .item, .bar-row, .cb-row[data-jump]'); if (!b) return;
+  const b = ev.target.closest('button, .item, .bar-row, .cb-head'); if (!b) return;
   const d = b.dataset;
   if (d.view) { if (b.closest('dialog')) b.closest('dialog').close(); return go(d.view); }
   if (d.type) { state.type = d.type; state.category = cats(d.type)[0]; return renderForm(); }
@@ -1096,10 +1083,8 @@ document.addEventListener('click', ev => {
   if (d.add !== undefined) { setAmount(d.add === '0' ? 0 : amountValue() + Number(d.add)); return; }
   if (d.shift) { state.date = addDays($('#f-date').value || today(), Number(d.shift)); return renderForm(); }
   if (d.pickmonth !== undefined) return openMonthPicker();
-  if (d.budedit !== undefined) return startBudEdit();
-  if (d.budsave !== undefined) return saveBudEdit();
-  if (d.budcancel !== undefined) { state.budEdit = null; return renderMonth(); }
   if (d.budavg !== undefined) return budToAverage();
+  if (d.budall !== undefined) { state.budAll = !state.budAll; return renderMonth(); }
   if (d.goal !== undefined) return openGoal();
   if (d.goalok !== undefined) return saveGoal();
   if (d.review !== undefined) return openReview();

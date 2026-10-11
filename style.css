@@ -142,25 +142,22 @@ button.title:active{background:var(--wash)}
 .tb-track i.over{background:var(--bad)}
 .tb-lab{display:flex;justify-content:space-between;font-size:12px;color:var(--mu);margin-top:6px}
 .tb-lab b{color:var(--t1)}
-.bud-done{background:var(--ink)!important;border-color:var(--ink)!important;color:var(--on-ink)!important;font-weight:700}
-.cb-hint{margin:14px 0 0;font-size:12px;color:var(--t-strong);background:var(--wash);border-radius:10px;padding:7px 10px}
 .cb-list{margin-top:16px;border-top:1px solid var(--grid);padding-top:6px}
-.cb-row{padding:9px 0}
-.cb-row[data-jump]{cursor:pointer}
-.cb-head{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin-bottom:5px}
+.cb-row{padding:10px 0 12px}
+.cb-head{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin-bottom:8px;cursor:pointer}
 .cb-name{color:var(--t1);font-weight:600}
 .cb-amt{color:var(--mu);font-size:12px}
 .cb-amt b{color:var(--t1)}
-.cb-track{position:relative;height:10px;border-radius:999px;background:var(--wash)}
+.cb-track{position:relative;height:12px;border-radius:999px;background:var(--wash);margin:0 11px}
 .cb-track i{position:absolute;top:0;bottom:0}
 .cb-fill{left:0;border-radius:999px;background:var(--s1)}
 .cb-over{background:var(--bad);border-radius:0 999px 999px 0}
-.cb-knob{width:3px;margin-left:-1.5px;top:-3px!important;bottom:-3px!important;border-radius:2px;background:var(--t1)}
-.cb-avg{width:2px;margin-left:-1px;top:-4px!important;bottom:-4px!important;background:var(--mu);opacity:.6}
-.cb-sub{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--mu);margin-top:4px}
-.cb-sub .chg{font-size:11px;min-width:0}
-.cb-list.editing .cb-track{height:14px;touch-action:none;cursor:ew-resize;background:var(--rest)}
-.cb-list.editing .cb-knob{width:22px;height:22px;margin-left:-11px;top:50%!important;bottom:auto!important;transform:translateY(-50%);border-radius:50%;background:var(--card);border:2.5px solid var(--ink);box-shadow:0 2px 6px rgba(0,0,0,.18)}
+.cb-knob{position:absolute;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;padding:0;border-radius:50%;background:var(--card);
+  border:3px solid var(--ink);box-shadow:0 2px 6px rgba(0,0,0,.2);touch-action:none;cursor:grab;z-index:1}
+.cb-knob::before{content:"";position:absolute;inset:-10px;border-radius:50%} /* 손가락으로 잡기 쉽게 잡는 범위를 넓힘 */
+.cb-knob.on{transform:scale(1.2);cursor:grabbing;background:var(--ink)}
+.cb-foot{display:flex;justify-content:space-between;gap:8px;margin-top:6px}
+.cb-hint{margin:10px 0 0;font-size:11px;color:var(--mu);text-align:center}
 .bud-note{margin:12px 0 0;font-size:13px;font-weight:600;border-radius:12px;padding:9px 12px;background:var(--wash);color:var(--t2)}
 .bud-note.bad{background:color-mix(in srgb,var(--bad) 10%,transparent);color:var(--bad)}
 .bud-note.good{color:var(--t-strong)}
