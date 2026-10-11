@@ -471,6 +471,15 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 .st-next .bar{flex:1;height:8px;border-radius:999px;background:var(--card);overflow:hidden;min-width:40px}
 .st-next .bar i{display:block;height:100%;background:var(--ink);border-radius:999px}
 .st-next b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:42%}
+.st-act{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.st-act button{position:relative;border:0;border-radius:16px;padding:12px 0;font-size:15px;font-family:var(--round),sans-serif}
+.st-rv{background:#FFF1D6;color:#8a5a00}
+.st-rv:disabled{opacity:.55;cursor:default}
+.st-hd{background:linear-gradient(180deg,var(--ink),var(--ink-2));color:var(--on-ink);box-shadow:0 4px 0 color-mix(in srgb,var(--ink) 60%,#000)}
+.st-badge{position:absolute;top:-7px;right:-4px;min-width:20px;padding:1px 6px;border-radius:999px;background:var(--bad);color:#fff;font-size:11px;border:2px solid var(--card)}
+.st-none{margin:6px 0 0;font-size:11px;color:var(--mu);text-align:left}
+:root[data-theme="dark"] .st-rv{background:#33290f;color:#f3d48a}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .st-rv{background:#33290f;color:#f3d48a}}
 .st-goal{display:flex;justify-content:space-between;width:100%;margin-top:10px;border:0;background:none;padding:6px 2px 0;font-size:13px;color:var(--t2);text-align:left}
 .st-goal span{color:var(--mu)}
 

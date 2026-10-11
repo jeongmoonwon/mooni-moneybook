@@ -249,16 +249,6 @@ function renderHome() {
   renderStatus();
   renderHomeBadges();
 
-  const n = reviewQueue().length;
-  $('#home-review').innerHTML = n ? `<button class="review-card" data-review><span class="e">💭</span>
-    <span><b>리뷰할 소비 ${n}개</b><small>${reviewCfg().days}일 전에 쓴 돈, 지금 돌아보니 어때요?</small></span><span class="go">›</span></button>` : '';
-
-  const held = state.held.filter(h => periodOf(h) === key), saved = held.reduce((s, h) => s + h.amount, 0);
-  $('#home-held').innerHTML = `<div class="held-card"><span class="e">🙌</span>
-    <span>${held.length ? `<b>이번 달 참은 소비 ${held.length}번</b><small>${saved ? won(saved) + ' 아꼈어요' : '잘 참았어요!'}</small>`
-      : '<b>사려다 참은 게 있나요?</b><small>참은 것도 기록해 두면 뿌듯해요</small>'}</span>
-    <button class="chip sm" data-held="">+ 참았어요</button></div>`;
-
   renderPeriodNav();
   renderCalSum();
   renderCalendar();
@@ -512,13 +502,16 @@ function renderStatus() {
   const list = badgesOf(key), ps = list.map(b => badgeProgress(b, key));
   // 다음 배지: 아직 못 받은 것 중 가장 많이 찬 것
   const nextI = ps.map((p, i) => i).filter(i => !ps[i].done && !ps[i].fail).sort((a, b) => ps[b].fill - ps[a].fill)[0];
-  const goal = (state.settings.goals || {})[key] || '';
+  const goal = (state.settings.goals || {})[key] || '', rq = reviewQueue().length;
   $('#home-status').innerHTML = `<div class="card status">
     <div class="st-top"><div class="st-face">${look.face}${look.deco ? `<i>${look.deco}</i>` : ''}<span class="st-lv">Lv.${lv}</span></div>
       <div><p class="st-title">${esc(look.title)}</p><h2>${head}</h2><p class="label" style="margin:0">${sub}</p></div></div>
     <div class="st-chips"><div><b>${cur.sat != null ? cur.sat + '%' : '–'}</b><small>😊 만족</small></div><div><b>${cur.held}번</b><small>🙌 참음</small></div>
       <div><b>${ps.filter(p => p.done).length}/${list.length}</b><small>🏅 배지</small></div><div class="warn"><b>${cur.regret}번</b><small>😣 후회</small></div></div>
     ${nextI != null ? `<div class="st-next"><span>🏅 다음 배지</span><div class="bar"><i style="width:${Math.round(ps[nextI].fill * 100)}%"></i></div><b>${esc(badgeName(list[nextI]))}</b></div>` : ''}
+    <div class="st-act"><button class="st-rv" data-review ${rq ? '' : 'disabled'}>💭 리뷰하기${rq ? `<span class="st-badge">${rq}</span>` : ''}</button>
+      <button class="st-hd" data-held="">🙌 참았어요</button></div>
+    ${rq ? '' : '<p class="st-none">지금은 리뷰할 소비가 없어요</p>'}
     <button class="st-goal" data-goal>🎯 ${goal ? esc(goal) : `${m}월 다짐 적기`} <span>✎</span></button></div>`;
   renderRecap(key, prev, look, hasPrev);
 }
