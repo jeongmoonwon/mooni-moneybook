@@ -77,9 +77,18 @@ let store = null;
 const state = {
   user: null, entries: [], held: [], settings: { payday: 25 }, pending: false,
   view: 'home', type: '지출', category: '식비', date: today(), editing: null, heldEditing: null, rv: [], rvI: 0,
-  period: null, calDay: today(), trendType: '지출', trendCat: '', trendRange: 'year', trendFrom: '', trendTo: '', trendRangeOpen: false, fltType: '', fltCat: '', q: '', visible: [],
+  period: null, calDay: today(), trendType: '지출', trendCat: '', ...savedTrendRange(), trendRangeOpen: false, fltType: '', fltCat: '', q: '', visible: [],
   info: false, ceType: '지출', ceDelete: null, calc: '', split: null,
 };
+// 추이 탭에서 고른 기간(최근 1년 · 전체 · 직접 선택)을 이 기기에 기억
+function savedTrendRange() {
+  try { const r = JSON.parse(localStorage.getItem('trendRange') || 'null'); if (r && ['year', 'all', 'custom'].includes(r.range)) return { trendRange: r.range, trendFrom: r.from || '', trendTo: r.to || '' }; } catch { /* 무시 */ }
+  return { trendRange: 'year', trendFrom: '', trendTo: '' };
+}
+function saveTrendRange() {
+  try { localStorage.setItem('trendRange', JSON.stringify({ range: state.trendRange, from: state.trendFrom, to: state.trendTo })); } catch { /* 기억 못 해도 동작에는 문제 없음 */ }
+}
+
 function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
 // 앱 맨 위 제목만 사용자가 바꿀 수 있다. 브라우저 탭·홈 화면·내보내기 파일 이름은 항상 'mooni의 가계부'.
@@ -1599,6 +1608,7 @@ $('#entry-sheet').addEventListener('close', () => { state.editing = null; });
 $('#trend-range').addEventListener('change', ev => {
   if (ev.target.id === 'tr-from') state.trendFrom = ev.target.value;
   if (ev.target.id === 'tr-to') state.trendTo = ev.target.value;
+  saveTrendRange();
   state.trendSel = null; state.trendScrolled = false; renderTrend();
 });
 $('#trend-chart').addEventListener('click', ev => {
@@ -1663,7 +1673,7 @@ document.addEventListener('click', ev => {
   if (d.pshift) { state.period = shiftPeriod(state.period, Number(d.pshift)); state.calDay = null; return refreshAll(); }
   if (d.trendtype) { state.trendType = d.trendtype; state.trendCat = ''; state.trendSel = null; state.trendScrolled = false; return renderTrend(); }
   if (d.trangetoggle !== undefined) { state.trendRangeOpen = !state.trendRangeOpen; return renderTrend(); }
-  if (d.trange) { state.trendRange = d.trange; state.trendSel = null; state.trendScrolled = false; return renderTrend(); }
+  if (d.trange) { state.trendRange = d.trange; saveTrendRange(); state.trendSel = null; state.trendScrolled = false; return renderTrend(); }
   if (d.trendcat !== undefined) { state.trendCat = d.trendcat; return renderTrend(); }
   if (d.addday) return addOnDay(d.addday);
   if (d.gomonth) { state.period = d.gomonth; state.calDay = null; return go('month'); }

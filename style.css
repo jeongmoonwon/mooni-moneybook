@@ -615,3 +615,6 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 .rv-sub{margin-top:8px}
 .rv-sub .btn{padding:11px;font-size:13px}
 #rv-body .btn.primary:disabled{opacity:.45;box-shadow:none;cursor:default}
+
+/* 기록하기 창 카테고리 버튼은 조금 작게 */
+#cat-chips .chip{font-size:13px;padding:5px 11px}
