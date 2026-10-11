@@ -809,21 +809,20 @@ function budgetHtml(exp) {
   const cb = catBudgetsOf(state.period), map = cb.map, byCat = sumBy(exp, e => e.category);
   state.budCtx = { byCat, avg: cb.avg, spent: exp.reduce((s, e) => s + e.amount, 0) };
   return `<div id="bud-total">${budTotalHtml(map)}</div>
-    ${catPieHtml(byCat)}
-    ${sumOf(map) ? catBudgetsSection(map, byCat) : ''}`;
+    ${sumOf(map) ? catSpendSection(map, byCat) : ''}
+    ${catPieHtml(byCat)}`;
 }
-
-function catBudgetsSection(map, byCat) {
-  const used = c => map[c] || byCat.get(c), open = state.budOpen;
-  const shown = state.budAll ? cats('지출') : cats('지출').filter(used); // 카테고리 순서 그대로 (설정 > 카테고리에서 바꿀 수 있음)
-  const hidden = cats('지출').filter(c => !used(c)).length;
-  return `<button class="cb-toggle" data-budopen aria-expanded="${!!open}"><span>카테고리별 예산</span><i>${open ? '접기 ▴' : '펼치기 ▾'}</i></button>
-    ${open ? `<div class="cb-list">${shown.map(c => cbRowHtml(c, map[c] || 0)).join('')}</div>
-      <div class="cb-foot">${hidden || state.budAll ? `<button class="chip sm" data-budall>${state.budAll ? '쓰는 카테고리만 보기' : `카테고리 ${hidden}개 더 보기`}</button>` : '<span></span>'}
-        <button class="chip sm" data-budget>전체 예산 다시 나누기</button></div>
-      <p class="cb-hint">● 손잡이를 좌우로 끌어서 예산을 정해요 · 막대 끝은 카테고리마다 달라요</p>` : ''}`;
+// 총 예산 막대 아래 '지출 카테고리별로 보기': 예산 대비 쓴 비율이 높은 순서로 같은 모양의 막대
+function catSpendSection(map, byCat) {
+  const open = state.budOpen;
+  if (!open) return '<button class="cb-toggle" data-budopen aria-expanded="false"><span>지출 카테고리별로 보기</span><i>펼치기 ▾</i></button>';
+  const rows = cats('지출').map(c => ({ c, b: map[c] || 0, s: byCat.get(c) || 0 })).filter(r => r.b || r.s)
+    .map(r => ({ ...r, r: r.b ? r.s / r.b : Infinity })).sort((x, y) => y.r - x.r || y.s - x.s);
+  return `<button class="cb-toggle" data-budopen aria-expanded="true"><span>지출 카테고리별로 보기</span><i>접기 ▴</i></button>
+    <div class="cs-list">${rows.map(({ c, b, s }) => `<button class="cs-row" data-jump="지출|${esc(c)}">
+      <span class="cs-head"><span>${esc(c)}</span><span class="num">${b ? `${compact(s)} / <b>${compact(b)}</b>` : `<b class="over">예산 없이 ${compact(s)}</b>`}</span></span>
+      <span class="tb-track"><i style="width:${b ? Math.min(100, s / b * 100) : 100}%" class="${!b || s > b ? 'over' : ''}"></i></span></button>`).join('')}</div>`;
 }
-
 // 카테고리별 지출 비율 원그래프: 큰 순서로 5개(5% 이상)만 따로, 나머지는 '기타'. 조각 사이 2px 틈.
 // 범례 대신 각 조각 바깥쪽에 이름·비율을 글자로 붙인다 (색 위에 글자를 얹으면 밝은 색에서 안 읽혀서)
 function catPieHtml(byCat) {
@@ -880,81 +879,90 @@ function budTotalHtml(map) {
     <div class="tb-lab"><span>쓴 돈 <b class="num">${won(spent)}</b></span><span>총 예산 <b class="num">${won(budget)}</b></span></div></div>${note}`;
 }
 
-// 전체 예산 정하기: 입력한 금액을 모든 지출 카테고리에 똑같이 나눠 넣는다 (천원 단위, 남는 돈은 첫 카테고리에)
+// 'N월 예산' 창: 전체 예산(입력·끌기) + 카테고리별 예산(손잡이). 고치는 동안은 초안에만 두고 '저장'을 눌러야 반영
+// 전체를 바꾸면 카테고리 예산을 지금 비율대로 늘리거나 줄이고(처음이면 똑같이), 카테고리를 바꾸면 전체가 다시 계산된다
 function openBudget() {
-  const [y, m] = state.period.split('-').map(Number), v = sumOf(catBudgetsOf(state.period).map);
-  $('#b-title').textContent = `${y}년 ${m}월 전체 예산`;
-  $('#b-amount').value = v ? v.toLocaleString('ko-KR') : '';
-  // 끌어서 정하는 막대: 끝은 최근 12개월 월평균 지출의 2배(최소 300만)를 1·2·5 단위로 올림, 1만원씩
-  const avg = baseline(state.period).avg('지출'), max = catScale(v, avg * 2 / 1.2, 1500000);
-  const sl = $('#b-slider'); sl.max = max; sl.step = 10000; sl.value = v || Math.round(avg / 10000) * 10000;
+  const [y, m] = state.period.split('-').map(Number), cb = catBudgetsOf(state.period);
+  state.budDraft = { ...cb.map }; state.budAvg = cb.avg;
+  $('#b-title').textContent = `${y}년 ${m}월 예산`;
+  const v = sumOf(state.budDraft), avg = baseline(state.period).avg('지출');
+  const max = catScale(v, avg * 2 / 1.2, 1500000), sl = $('#b-slider');
+  sl.max = max; sl.step = 10000;
   $('#b-scale').innerHTML = `<span>0</span>${avg ? `<span class="b-avg" style="left:${avg / max * 100}%">▲ 최근 평균 ${compact(avg)}</span>` : ''}<span>${compact(max)}</span>`;
-  if (!v && avg) $('#b-amount').value = Number(sl.value).toLocaleString('ko-KR');
-  paintBudgetSlider();
-  $('#budget-editor').showModal(); $('#b-amount').focus();
+  if (!v && avg) splitBudget(Math.round(avg / 10000) * 10000, true);
+  renderBudgetSheet();
+  $('#budget-editor').showModal(); document.activeElement.blur();
+}
+function splitBudget(total, equal) {
+  const cs = cats('지출'), cur = sumOf(state.budDraft);
+  if (equal || !cur) {
+    const each = Math.floor(total / cs.length / 1000) * 1000;
+    state.budDraft = Object.fromEntries(cs.map((c, i) => [c, i ? each : total - each * (cs.length - 1)]));
+  } else {
+    const k = total / cur; let acc = 0;
+    cs.forEach(c => { state.budDraft[c] = Math.round((state.budDraft[c] || 0) * k / 1000) * 1000; acc += state.budDraft[c]; });
+    const big = cs.reduce((a, c) => (state.budDraft[c] > state.budDraft[a] ? c : a), cs[0]);
+    state.budDraft[big] += total - acc; // 반올림 차이는 가장 큰 카테고리에서 맞춤
+  }
+}
+function renderBudgetTotal() {
+  const v = sumOf(state.budDraft), sl = $('#b-slider');
+  $('#b-amount').value = v ? v.toLocaleString('ko-KR') : '';
+  if (v > Number(sl.max)) sl.max = catScale(v, 0, 0);
+  sl.value = v; paintBudgetSlider();
+}
+function renderBudgetSheet() {
+  renderBudgetTotal();
+  $('#b-cats').innerHTML = cats('지출').map(c => cbRowHtml(c, state.budDraft[c] || 0)).join('');
 }
 function paintBudgetSlider() { // 막대의 채워진 부분 색칠
   const sl = $('#b-slider'); sl.style.setProperty('--p', `${Math.min(100, sl.value / sl.max * 100)}%`);
 }
+function setBudgetTotal(v, equal) { splitBudget(v, equal); renderBudgetSheet(); }
 function saveBudget() {
-  const v = Number($('#b-amount').value.replace(/[^\d]/g, ''));
-  if (!v) { toast('예산을 입력해 주세요'); return $('#b-amount').focus(); }
-  const cs = cats('지출'), each = Math.floor(v / cs.length / 1000) * 1000;
-  const map = Object.fromEntries(cs.map((c, i) => [c, i ? each : v - each * (cs.length - 1)]));
+  if (!sumOf(state.budDraft)) { toast('예산을 정해 주세요'); return; }
   $('#budget-editor').close();
-  saveCatBudgets(map);
-  toast(`카테고리 ${cs.length}개에 ${compact(each)}원씩 나눴어요`);
+  saveCatBudgets({ ...state.budDraft });
+  toast('예산을 저장했어요');
 }
-
+// 예산 창의 카테고리 줄: 지출은 보여주지 않고 예산만 (막대 끝은 카테고리마다 최근 12개월 평균의 약 2배)
 function cbRowHtml(c, b, M) {
-  const { byCat, avg } = state.budCtx, s = byCat.get(c) || 0;
-  M = M || catScale(b, s, avg[c] || 0);
+  M = M || catScale(b, 0, (state.budAvg || {})[c] || 0);
   const pct = v => `${Math.min(100, v / M * 100)}%`;
   return `<div class="cb-row" data-cbcat="${esc(c)}" data-scale="${M}">
-    <div class="cb-head" data-jump="지출|${esc(c)}"><span class="cb-name">${esc(c)}</span><span class="cb-amt num">${compact(s)} / <b>${b ? compact(b) : '–'}</b></span></div>
-    <div class="cb-track">
-      <i class="cb-fill" style="width:${pct(Math.min(s, b))}"></i>
-      ${s > b ? `<i class="cb-over" style="left:${pct(b)};width:${pct(s - b)}"></i>` : ''}
-      <button class="cb-knob" style="left:${pct(b)}" aria-label="${esc(c)} 예산 ${won(b)}, 좌우로 끌어서 바꾸기"></button>
-    </div>
+    <div class="cb-head"><span class="cb-name">${esc(c)}</span><span class="cb-amt num"><b>${b ? won(b) : '–'}</b></span></div>
+    <div class="cb-track"><i class="cb-fill bud" style="width:${pct(b)}"></i>
+      <button class="cb-knob" style="left:${pct(b)}" aria-label="${esc(c)} 예산 ${won(b)}, 좌우로 끌어서 바꾸기"></button></div>
     <div class="cb-scale num"><span>0</span><span>${compact(M)}</span></div>
   </div>`;
 }
-
 function saveCatBudgets(map) {
   state.settings.catBudgets = { ...state.settings.catBudgets, [state.period]: map }; // 저장이 돌아오기 전에도 바로 보이게
   renderMonth();
   store.saveSettings({ catBudgets: state.settings.catBudgets }).catch(err => toast('예산 저장 실패: ' + errMsg(err)));
 }
-
-// 손잡이 끌기: 끄는 동안은 그 줄과 맨 위 합계만 고쳐서 손가락을 놓치지 않게 하고, 놓으면 저장
+// 손잡이 끌기: 끄는 동안은 그 줄과 전체 금액만 고쳐서 손가락을 놓치지 않게 한다
 function budDragStart(ev) {
   const knob = ev.target.closest('.cb-knob'); if (!knob) return;
   const tr = knob.parentElement, row = tr.closest('.cb-row'), c = row.dataset.cbcat;
-  const map = { ...catBudgetsOf(state.period).map }, M = Number(row.dataset.scale), step = M <= 100000 ? 1000 : M <= 500000 ? 5000 : 10000; // 끄는 동안 이 줄의 눈금은 고정
+  const M = Number(row.dataset.scale), step = M <= 100000 ? 1000 : M <= 500000 ? 5000 : 10000; // 끄는 동안 이 줄의 눈금은 고정
   ev.preventDefault();
   knob.classList.add('on');
-  let moved = false;
   const move = e => {
     const r = tr.getBoundingClientRect(), x = Math.min(Math.max(e.clientX - r.left, 0), r.width);
     const v = Math.round(x / r.width * M / step) * step;
-    if (v === map[c]) return;
-    map[c] = v; moved = true;
-    const tmp = document.createElement('div'); tmp.innerHTML = cbRowHtml(c, v, M);
-    row.querySelector('.cb-head').replaceWith(tmp.querySelector('.cb-head'));
-    for (const el of [...tr.children]) if (el !== knob) el.remove(); // 손잡이는 그대로 두고 막대만 새로
-    for (const el of [...tmp.querySelector('.cb-track').children]) if (!el.classList.contains('cb-knob')) tr.insertBefore(el, knob);
-    knob.style.left = `${Math.min(100, v / M * 100)}%`;
-    $('#bud-total').innerHTML = budTotalHtml(map);
+    if (v === state.budDraft[c]) return;
+    state.budDraft[c] = v;
+    row.querySelector('.cb-amt b').textContent = v ? won(v) : '–';
+    tr.querySelector('.cb-fill').style.width = knob.style.left = `${Math.min(100, v / M * 100)}%`;
+    renderBudgetTotal();
   };
   const up = () => { // 손가락이 손잡이 밖으로 나가도 따라가도록 화면 전체에서 듣는다
     removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
     knob.classList.remove('on');
-    if (moved) saveCatBudgets(map);
   };
   addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', up);
 }
-
 function barsHtml(map, color, type, base, label) {
   const rows = [...map].sort((a, b) => b[1] - a[1]);
   if (!rows.length) return '<p class="empty">기록이 없어요</p>';
@@ -1483,7 +1491,7 @@ document.addEventListener('click', ev => {
   if (d.budget !== undefined) return openBudget();
   if (d.budgetok !== undefined) return saveBudget();
   if (d.budopen !== undefined) { state.budOpen = !state.budOpen; return renderMonth(); }
-  if (d.budall !== undefined) { state.budAll = !state.budAll; return renderMonth(); }
+  if (d.budsplit !== undefined) { setBudgetTotal(sumOf(state.budDraft) || Number($('#b-slider').value), true); return toast('카테고리마다 똑같이 나눴어요'); }
   if (d.goal !== undefined) return openGoal();
   if (d.badgeedit !== undefined) return openBadgeEditor();
   if (d.badgeall !== undefined) return openEarned();
@@ -1560,10 +1568,11 @@ $('#s-rv-min').addEventListener('keydown', e => { if (e.key === 'Enter') e.targe
 $('#s-rv-days').addEventListener('change', e => saveReviewCfg({ days: Number(e.target.value) }));
 $('#g-text').addEventListener('keydown', e => { if (e.key === 'Enter') saveGoal(); });
 $('#f-amount').addEventListener('input', () => setAmount(amountValue()));
-$('#summary').addEventListener('pointerdown', budDragStart);
+$('#budget-editor').addEventListener('pointerdown', budDragStart);
 $('#b-amount').addEventListener('input', e => { const n = Number(e.target.value.replace(/[^\d]/g, '')); e.target.value = n ? n.toLocaleString('ko-KR') : ''; $('#b-slider').value = n; paintBudgetSlider(); });
-$('#b-slider').addEventListener('input', e => { $('#b-amount').value = Number(e.target.value).toLocaleString('ko-KR'); paintBudgetSlider(); });
-$('#b-amount').addEventListener('keydown', e => { if (e.key === 'Enter') saveBudget(); });
+$('#b-amount').addEventListener('change', e => setBudgetTotal(Number(e.target.value.replace(/[^\d]/g, '')) || 0));
+$('#b-slider').addEventListener('input', e => setBudgetTotal(Number(e.target.value)));
+$('#b-amount').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
 $('#f-amount').addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
 $('#flt-type').addEventListener('change', e => { state.fltType = e.target.value; renderList(); });
 $('#flt-cat').addEventListener('change', e => { state.fltCat = e.target.value; renderList(); });

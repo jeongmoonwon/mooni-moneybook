@@ -316,12 +316,15 @@
 
 
 <!-- 전체 예산 -->
-<dialog id="budget-editor"><div class="body">
-  <h2 id="b-title">전체 예산</h2>
+<dialog id="budget-editor" class="sheet"><div class="body">
+  <div class="sheet-head"><h2 id="b-title">예산</h2><button class="icon-btn" data-close aria-label="닫기">✕</button></div>
+  <p class="label" style="margin:0 0 4px">전체 예산</p>
   <input class="input amount num" id="b-amount" inputmode="numeric" placeholder="0" autocomplete="off">
   <input type="range" class="b-slider" id="b-slider" min="0" aria-label="전체 예산 끌어서 정하기">
   <div class="b-scale num" id="b-scale"></div>
-  <p class="note">지출 카테고리마다 똑같이 나눠 넣어요. 그다음 '카테고리별 예산'에서 손잡이로 조정하면 돼요. 이미 조정한 카테고리 예산도 다시 나눠져요.</p>
+  <p class="note" style="margin-top:8px">전체를 바꾸면 카테고리 예산이 지금 비율대로 늘거나 줄어요. 카테고리를 끌면 전체가 다시 계산돼요.</p>
+  <div class="card-head" style="margin:16px 0 4px"><h2 style="margin:0;font-size:16px">카테고리별 예산</h2><button class="chip sm" data-budsplit>똑같이 나누기</button></div>
+  <div id="b-cats"></div>
   <div class="actions"><button class="btn ghost" data-close>취소</button><button class="btn primary" data-budgetok>저장</button></div>
 </div></dialog>
 

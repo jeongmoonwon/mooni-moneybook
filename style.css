@@ -568,3 +568,14 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 .pie-etc button:first-of-type{border-top:0}
 .pie-etc span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pie-etc small{font-size:11px;color:var(--mu);text-align:right}
+
+/* 한 달 탭: 지출 카테고리별로 보기 (예산 대비 쓴 비율 높은 순) */
+.cs-list{display:grid;gap:12px;margin-top:10px}
+.cs-row{display:block;width:100%;border:0;background:none;padding:0;text-align:left;color:var(--t1)}
+.cs-head{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px}
+.cs-head .num{color:var(--mu);font-size:12px}
+.cs-head b{color:var(--t1)}
+.cs-head b.over{color:var(--bad)}
+.cs-row .tb-track{display:block;height:10px}
+.cs-row .tb-track i{display:block}
+.cb-fill.bud{background:var(--ink)}
