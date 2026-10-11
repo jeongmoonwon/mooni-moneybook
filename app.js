@@ -626,7 +626,7 @@ function renderCalendar() {
     const d = parse(s), v = ex.get(s);
     const lab = d.getDate() === 1 || s === start ? `${d.getMonth() + 1}/${d.getDate()}` : d.getDate();
     const hol = holidayName(s);
-    html += `<button data-day="${s}" aria-pressed="${s === state.calDay}" class="${d.getDay() === 0 || hol ? 'sun' : ''}"
+    html += `<button data-day="${s}" aria-pressed="${s === state.calDay}" class="${d.getDay() === 0 || hol ? 'sun' : d.getDay() === 6 ? 'saturday' : ''}"
       aria-label="${d.getMonth() + 1}월 ${d.getDate()}일${hol ? ' ' + esc(hol) : ''}${v ? ' 지출 ' + won(v) : ''}"${hol ? ` title="${esc(hol)}"` : ''}>
       <span class="d ${s === t ? 'today' : ''}">${lab}</span>
       ${v ? `<span class="lv lv${level(v)}" title="지출 ${won(v)}"></span>` : '<span class="lv"></span>'}

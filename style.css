@@ -196,7 +196,8 @@ button.title:active{background:var(--wash)}
 .cal-nav .step{width:36px;height:36px;border-radius:12px;font-size:16px}
 .cal-nav .title b{font-size:17px}
 .hol-name{color:var(--bad);font-weight:600}
-.cal .sun .d.today{color:var(--on-ink)}
+.cal .saturday .d{color:var(--down)}
+.cal .sun .d.today,.cal .saturday .d.today{color:var(--on-ink)}
 
 /* 내역 필터 */
 .filters{display:flex;gap:8px;margin-bottom:10px}
