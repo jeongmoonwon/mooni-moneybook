@@ -841,14 +841,14 @@ function catPieHtml(byCat) {
     const mid = (off + len / 2) / C * 2 * Math.PI - Math.PI / 2, lr = R + W / 2 + 10; // 조각 가운데 각도, 12시에서 시계방향
     const x = CX + Math.cos(mid) * lr, y = CY + Math.sin(mid) * lr, anchor = Math.abs(Math.cos(mid)) < 0.25 ? 'middle' : Math.cos(mid) > 0 ? 'start' : 'end';
     const jump = p.etc ? ' data-pieetc="1"' : ` data-jump="지출|${esc(p.c)}"`;
-    labels += `<g class="pl"${jump}><text x="${x}" y="${y - 1}" text-anchor="${anchor}" class="pl-n">${esc(p.c)}${p.etc ? (state.pieEtc ? ' ▸' : ' ▾') : ''}</text>
+    labels += `<g class="pl"${jump}><text x="${x}" y="${y - 1}" text-anchor="${anchor}" class="pl-n">${esc(p.c)}${p.etc ? (state.pieEtc ? ' ▴' : ' ▾') : ''}</text>
       <text x="${x}" y="${y + 12}" text-anchor="${anchor}" class="pl-v">${pct}% · ${compact(p.v)}</text></g>`;
     const arc = `<circle r="${R}" cx="${CX}" cy="${CY}" fill="none" stroke="${p.color}" stroke-width="${W}" stroke-dasharray="${dash} ${C - dash}" stroke-dashoffset="${-off}" transform="rotate(-90 ${CX} ${CY})"${jump}>
       <title>${esc(p.c)} ${won(p.v)} (${pct}%)${p.etc ? ' · ' + esc(p.etc) : ''}</title></circle>`;
     off += len; return arc;
   }).join('');
   const open = rest && state.pieEtc;
-  const etc = open ? `<div class="pie-etc"><p>그 외 ${restRows.length}개</p>${restRows.map(([c, v]) => `<button data-jump="지출|${esc(c)}"><span>${esc(c)}</span><b class="num">${compact(v)}</b><small>${Math.round(v / total * 100)}%</small></button>`).join('')}</div>` : '';
+  const etc = open ? `<div class="pie-etc"><p>그 외 ${restRows.length}개 · 누르면 상세내역</p>${restRows.map(([c, v]) => `<button data-jump="지출|${esc(c)}"><span>${esc(c)}</span><b class="num">${compact(v)}</b><small>${Math.round(v / total * 100)}%</small></button>`).join('')}</div>` : '';
   return `<div class="pie${open ? ' open' : ''}"><svg viewBox="0 0 340 236" role="img" aria-label="카테고리별 지출 비율">${arcs}${labels}${paceText(total, CX, CY)}</svg>${etc}</div>`;
 }
 

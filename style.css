@@ -248,8 +248,8 @@ button.title:active{background:var(--wash)}
 .cal .in{font-size:10px;color:var(--income);font-weight:700}
 .cal .sun .d{color:var(--bad)}
 .cal-nav{margin:-4px 0 8px}
-.cal-sum{margin:2px 4px 14px;font-size:15px;color:var(--t1)}
-.cal-sum p{margin:0;line-height:1.7}
+.cal-sum{margin:2px 4px 12px;font-size:13px;color:var(--t1)}
+.cal-sum p{margin:0;line-height:1.6}
 .cal-sum b{font-weight:600}
 .cal-sum b.in{color:var(--income)}
 .cal-nav .step{width:36px;height:36px;border-radius:12px;font-size:16px}
@@ -561,10 +561,9 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 
 /* 원그래프 '그 외' 펼치기: 그래프 옆에 안에 든 카테고리 */
 .pie [data-pieetc]{cursor:pointer}
-.pie.open{display:grid;grid-template-columns:1.55fr 1fr;align-items:center;gap:6px}
-.pie-etc{background:var(--page);border-radius:14px;padding:8px}
+.pie-etc{background:var(--page);border-radius:14px;padding:8px 10px;margin-top:6px}
 .pie-etc p{margin:0 0 4px;font-size:11px;color:var(--mu);font-weight:700}
-.pie-etc button{display:grid;grid-template-columns:1fr auto;width:100%;border:0;background:none;padding:5px 2px;text-align:left;color:var(--t1);border-top:1px solid var(--grid);font-size:12px}
+.pie-etc button{display:grid;grid-template-columns:1fr auto 40px;gap:8px;width:100%;border:0;background:none;padding:8px 2px;text-align:left;color:var(--t1);border-top:1px solid var(--grid);font-size:12px}
 .pie-etc button:first-of-type{border-top:0}
 .pie-etc span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pie-etc small{grid-column:1/-1;font-size:10px;color:var(--mu)}
+.pie-etc small{font-size:11px;color:var(--mu);text-align:right}
