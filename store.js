@@ -21,7 +21,8 @@ function createStore() {
 }
 
 const monthOf = e => e.date.slice(0, 7);
-const pick = e => ({ date: e.date, type: e.type, category: e.category, detail: e.detail || '', amount: Number(e.amount) || 0, memo: e.memo || '', ...(e.feel ? { feel: e.feel } : {}) });
+const pick = e => ({ date: e.date, type: e.type, category: e.category, detail: e.detail || '', amount: Number(e.amount) || 0, memo: e.memo || '',
+  ...(e.feel ? { feel: e.feel } : {}), ...(e.mood ? { mood: e.mood } : {}), ...(e.feelMemo ? { feelMemo: e.feelMemo } : {}) });
 
 async function firebaseStore(cfg) {
   const base = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;

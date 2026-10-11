@@ -240,13 +240,14 @@ function removeEditing() {
 /* ================= 홈 ================= */
 const HELD = '참음'; // 참은 소비는 기록과 같은 곳에 이 구분으로 저장
 const FEELS = { '필수': '🧾', '만족': '😊', '후회': '😣' };
+// 후회를 고르면 한 번 더 묻는 그때 기분 (타이핑 없이 톡)
+const MOODS = [['지쳐서', '😩'], ['스트레스', '😤'], ['심심해서', '🥱'], ['들떠서', '🎉'], ['분위기상', '🤝'], ['늦은 밤', '🌙']];
 
 function renderHome() {
-  const key = periodOfDate(today()), m = Number(key.slice(5));
-  const goal = (state.settings.goals || {})[key] || '';
-  $('#home-goal').innerHTML = goal
-    ? `<button class="goal" data-goal><span class="e">🎯</span><span class="g-main"><small>${m}월 목표</small><b>${esc(goal)}</b></span><span class="pen">✎</span></button>`
-    : `<button class="goal empty" data-goal><span class="e">🎯</span><span class="g-main"><b>${m}월 소비 목표를 정해 보세요</b><small>앱을 켤 때마다 여기에 보여요</small></span></button>`;
+  const key = periodOfDate(today());
+  ensureMonthBadges();
+  renderStatus();
+  renderHomeBadges();
 
   const n = reviewQueue().length;
   $('#home-review').innerHTML = n ? `<button class="review-card" data-review><span class="e">💭</span>
@@ -271,10 +272,276 @@ function renderCalSum() {
   $('#cal-sum').innerHTML = `<p>수입 <b class="num in">+${won(sum('수입'))}</b></p><p>지출 <b class="num ex">−${won(sum('지출'))}</b></p>`;
 }
 
+/* ================= 배지 (한 달 단위 도전) ================= */
+// settings.badges = { 'YYYY-MM': [배지, ...] }. 배지 = { id, kind, cat, n, unit('count'|'amount'), title, origin }
+// origin: basic(기본) · carry(지난달에서 이어짐) · mine(내가 만든) · rec(추천)
+// 달이 바뀌면 기본 배지 + 지난달에 못 받은 배지로 새 목록을 만든다. 받았는지는 기록으로 매번 계산한다
+const BADGE_KINDS = {
+  held: { icon: '🙌', color: '#FFB59A', label: '참기', units: ['count', 'amount'], cat: true },
+  reduce: { icon: '📉', color: '#8ED9B4', label: '줄이기', units: ['count', 'amount'], cat: true },
+  sat: { icon: '😊', color: '#FFDB6E', label: '만족 비율', units: ['pct'] },
+  regret: { icon: '🌱', color: '#B8E0A0', label: '후회 줄이기', units: ['count'] },
+  review: { icon: '📝', color: '#9CC8FF', label: '리뷰 다 하기', units: [] },
+  daily: { icon: '🔥', color: '#FFB566', label: '꾸준히 기록', units: ['days'] },
+  budget: { icon: '🎯', color: '#F7A3BE', label: '예산 지키기', units: [] },
+};
+const CAT_ICON = { '식비': '🍚', '간식': '🍰', '카공': '☕', '생필품': '🧴', '취미/문화생활': '🎬', '자기개발': '📚', '의료/건강': '💊',
+  '의류': '👕', '미용': '💇', '여행': '✈️', '경조사/선물': '🎁', '가전': '📺', '교통비': '🚌', '통신비': '📱', '월세': '🏠', '배달': '🛵' };
+const BASIC_BADGES = () => [
+  { id: 'basic-held', kind: 'held', n: 3, unit: 'count', origin: 'basic' },
+  { id: 'basic-review', kind: 'review', origin: 'basic' },
+];
+const nfmt = (v, unit) => unit === 'amount' ? compact(v) + '원' : unit === 'pct' ? v + '%' : unit === 'days' ? v + '일' : v + '번';
+function badgeName(b) {
+  if (b.title) return b.title;
+  const c = b.cat ? b.cat + ' ' : '';
+  return { held: `${c}${nfmt(b.n, b.unit)} 참기`, reduce: `${c || '지출 '}${nfmt(b.n, b.unit)} 이하`, sat: `만족 ${b.n}% 넘기기`,
+    regret: `후회 ${b.n}번 이하`, review: '리뷰 다 하기', daily: `${b.n}일 기록하기`, budget: '예산 안에서 쓰기' }[b.kind];
+}
+const badgeIcon = b => (b.cat && CAT_ICON[b.cat]) || BADGE_KINDS[b.kind].icon;
+const badgesOf = key => ((state.settings.badges || {})[key] || []);
+
+// 진행도: fill(0~1) · label · done(받음) · fail(이번 달은 못 받음)
+function badgeProgress(b, key) {
+  const { start, end } = periodRange(key), t = today(), past = t > end;
+  const days = Math.round((parse(end) - parse(start)) / 864e5) + 1;
+  const elapsed = past ? 1 : t < start ? 0 : (Math.round((parse(t) - parse(start)) / 864e5) + 1) / days;
+  const exp = periodEntries(key).filter(e => e.type === '지출');
+  const mine = exp.filter(e => !b.cat || e.category === b.cat);
+  const val = (list, unit) => unit === 'amount' ? list.reduce((s, e) => s + e.amount, 0) : list.length;
+  // '이하' 배지: 한 달을 넘지 않고 버티는 동안 날짜만큼 차오르고, 넘으면 비워진다
+  const keepUnder = (used, n, unit) => used > n ? { fill: 0, label: '넘었어요', fail: true }
+    : past ? { fill: 1, label: '받았어요', done: true } : { fill: elapsed, label: `${nfmt(n - used, unit)} 남음` };
+  if (b.kind === 'held') {
+    const v = val(state.held.filter(h => periodOf(h) === key && (!b.cat || h.category === b.cat)), b.unit);
+    return v >= b.n ? { fill: 1, label: '받았어요', done: true } : { fill: v / b.n, label: `${nfmt(v, b.unit)} / ${nfmt(b.n, b.unit)}`, fail: past };
+  }
+  if (b.kind === 'reduce') return keepUnder(val(mine, b.unit), b.n, b.unit);
+  if (b.kind === 'regret') return keepUnder(exp.filter(e => e.feel === '후회').length, b.n, 'count');
+  if (b.kind === 'budget') {
+    const budget = sumOf(catBudgetsOf(key).map);
+    return budget ? keepUnder(val(exp, 'amount'), budget, 'amount') : { fill: 0, label: '예산을 정해 주세요' };
+  }
+  if (b.kind === 'sat') {
+    const rv = exp.filter(e => FEELS[e.feel]), tot = rv.reduce((s, e) => s + e.amount, 0);
+    if (!tot) return { fill: 0, label: '리뷰가 쌓이면 보여요', fail: past };
+    const r = Math.round(rv.filter(e => e.feel === '만족').reduce((s, e) => s + e.amount, 0) / tot * 100);
+    return r >= b.n ? (past ? { fill: 1, label: '받았어요', done: true } : { fill: 1, label: `지금 ${r}% · 달성 중` })
+      : { fill: r / b.n, label: `지금 ${r}%`, fail: past };
+  }
+  if (b.kind === 'review') {
+    const { min, days: d, cats: rc } = reviewCfg(), due = addDays(t, -d);
+    const elig = exp.filter(e => e.amount >= min && (!rc || rc.includes(e.category)) && e.date <= due);
+    const done = elig.filter(e => e.feel).length;
+    if (!elig.length) return past ? { fill: 0, label: '리뷰할 소비가 없었어요', fail: true } : { fill: 0, label: '리뷰할 소비가 생기면' };
+    return done === elig.length && past ? { fill: 1, label: '받았어요', done: true } : { fill: done / elig.length, label: `${done} / ${elig.length}`, fail: past && done < elig.length };
+  }
+  if (b.kind === 'daily') {
+    const v = new Set([...periodEntries(key), ...state.held.filter(h => periodOf(h) === key)].map(e => e.date)).size;
+    return v >= b.n ? { fill: 1, label: '받았어요', done: true } : { fill: v / b.n, label: `${v} / ${b.n}일`, fail: past };
+  }
+  return { fill: 0, label: '' };
+}
+
+// 이번 달 목록이 없으면 기본 배지 + 지난달에 못 받은 배지로 만든다 (한 번만 저장)
+function ensureMonthBadges() {
+  const key = periodOfDate(today()), all = state.settings.badges || {};
+  if (all[key] || state.badgeInit === key) return;
+  state.badgeInit = key;
+  const prevKey = Object.keys(all).filter(k => k < key).sort().at(-1);
+  const carry = prevKey ? all[prevKey].filter(b => b.origin !== 'basic' && !badgeProgress(b, prevKey).done)
+    .map(b => ({ ...b, id: newId(), origin: 'carry', from: prevKey })) : [];
+  saveBadges(key, [...BASIC_BADGES(), ...carry]);
+}
+function saveBadges(key, list) {
+  state.settings.badges = { ...state.settings.badges, [key]: list }; // 저장이 돌아오기 전에도 바로 보이게
+  store.saveSettings({ badges: state.settings.badges }).catch(err => toast('배지 저장 실패: ' + errMsg(err)));
+}
+function earnedBadges() {
+  const all = state.settings.badges || {}, out = [];
+  for (const k of Object.keys(all).sort()) for (const b of all[k]) if (badgeProgress(b, k).done) out.push({ ...b, key: k });
+  return out;
+}
+
+function badgeHtml(b, p, small) {
+  return `<span class="bd ${p.done ? 'full' : p.fill > 0 ? 'mid' : 'todo'}${small ? ' sm' : ''}" style="--c:${BADGE_KINDS[b.kind].color};--p:${Math.round(p.fill * 100)}%"><span>${badgeIcon(b)}</span></span>`;
+}
+function renderHomeBadges() {
+  const key = periodOfDate(today()), list = badgesOf(key), m = Number(key.slice(5));
+  const ps = list.map(b => badgeProgress(b, key)), got = ps.filter(p => p.done).length;
+  $('#home-badges').innerHTML = `<div class="card">
+    <div class="card-head" style="margin:0"><div><h2 style="margin:0">${m}월 배지</h2><p class="label" style="margin:2px 0 0">도전 중 ${list.length - got}개 · 받은 배지 ${got}개</p></div>
+      <button class="chip sm bud-edit" data-badgeedit>✎ 목록 편집하기</button></div>
+    ${list.length ? `<div class="bgrid">${list.map((b, i) => `<div>${badgeHtml(b, ps[i])}<small>${esc(badgeName(b))}</small><em>${esc(ps[i].label)}</em></div>`).join('')}</div>`
+      : '<p class="empty">목록 편집하기에서 배지를 추가해 보세요</p>'}
+    <button class="link-btn" data-badgeall style="margin-top:12px">지금까지 받은 배지 · ${earnedBadges().length}개 ›</button></div>`;
+}
+
+/* ----- 배지 목록 편집 (목록 편집하기를 눌러야 열림) ----- */
+const ORIGIN_TAG = { basic: ['기본', 'p1'], carry: ['지난달에서 이어짐', 'p2'], mine: ['내가 만든', 'p3'], rec: ['추천', 'p3'] };
+function openBadgeEditor() {
+  const key = periodOfDate(today());
+  state.badgeDraft = badgesOf(key).map(b => ({ ...b }));
+  renderBadgeEditor(); $('#badge-editor').showModal(); document.activeElement.blur();
+}
+function renderBadgeEditor() {
+  const key = periodOfDate(today()), L = state.badgeDraft;
+  const tag = b => { const [t, c] = ORIGIN_TAG[b.origin] || ORIGIN_TAG.mine; return `<span class="otag ${c}">${b.origin === 'carry' && b.from ? Number(b.from.slice(5)) + '월에서 이어짐' : t}</span>`; };
+  $('#be-list').innerHTML = L.length ? L.map((b, i) => `<div class="be-row">
+      <span class="ce-order"><button data-bemove="${i}|-1" ${i ? '' : 'disabled'} aria-label="위로">▲</button><button data-bemove="${i}|1" ${i < L.length - 1 ? '' : 'disabled'} aria-label="아래로">▼</button></span>
+      ${badgeHtml(b, badgeProgress(b, key), true)}
+      <button class="be-main" data-beedit="${i}"><b>${esc(badgeName(b))}</b>${tag(b)}<small>${badgeDesc(b)} · 눌러서 고치기</small></button>
+      <button class="icon-btn" data-bedel="${i}" aria-label="빼기">✕</button></div>`).join('')
+    : '<p class="empty">아직 배지가 없어요</p>';
+  const recs = badgeRecs().filter(r => !L.some(b => b.kind === r.kind && (b.cat || '') === (r.cat || '')));
+  $('#be-recs').innerHTML = recs.length ? recs.map((r, i) => `<div class="be-sug"><span class="bb" style="background:${BADGE_KINDS[r.kind].color}">${badgeIcon(r)}</span>
+      <span><b>${esc(badgeName(r))}</b><small>${esc(r.why)}</small></span><button class="chip sm" data-berec="${i}">+ 추가</button></div>`).join('')
+    : '<p class="note" style="margin:4px 0 0">지금은 추천할 배지가 없어요. 기록이 더 쌓이면 보여드릴게요</p>';
+  state.badgeRecs = recs;
+}
+const badgeDesc = b => [BADGE_KINDS[b.kind].label, b.cat, b.n != null && b.kind !== 'review' && b.kind !== 'budget' ? nfmt(b.n, b.unit || BADGE_KINDS[b.kind].units[0]) : ''].filter(Boolean).join(' · ');
+function saveBadgeEditor() {
+  saveBadges(periodOfDate(today()), state.badgeDraft);
+  $('#badge-editor').close(); renderHome(); toast('배지 목록을 저장했어요');
+}
+
+// 지난달 기록으로 '조금만 더' 해 볼 만한 배지를 추천
+function lastMonthStats() {
+  const key = shiftPeriod(periodOfDate(today()), -1), exp = periodEntries(key).filter(e => e.type === '지출');
+  const rv = exp.filter(e => FEELS[e.feel]), tot = rv.reduce((s, e) => s + e.amount, 0);
+  const cnt = new Map(); for (const e of exp) cnt.set(e.category, (cnt.get(e.category) || 0) + 1);
+  return { key, exp, cnt, held: state.held.filter(h => periodOf(h) === key).length,
+    sat: tot ? Math.round(rv.filter(e => e.feel === '만족').reduce((s, e) => s + e.amount, 0) / tot * 100) : null,
+    regret: exp.filter(e => e.feel === '후회').length };
+}
+function badgeRecs() {
+  const L = lastMonthStats(), out = [], fixed = new Set(['월세', '통신비']);
+  const top = [...L.cnt].filter(([c]) => !fixed.has(c)).sort((a, b) => b[1] - a[1])[0];
+  if (top && top[1] >= 4) out.push({ kind: 'reduce', cat: top[0], n: Math.round(top[1] * 0.75), unit: 'count', why: `지난달 ${top[1]}번 · 조금만 줄여 봐요` });
+  if (L.sat != null) out.push({ kind: 'sat', n: Math.min(95, Math.ceil((L.sat + 5) / 5) * 5), why: `지난달 만족 ${L.sat}%` });
+  out.push({ kind: 'held', n: Math.max(3, L.held + 2), unit: 'count', why: L.held ? `지난달 ${L.held}번 참았어요` : '참은 소비를 기록해 봐요' });
+  if (L.regret >= 2) out.push({ kind: 'regret', n: L.regret - 1, why: `지난달 후회 ${L.regret}번` });
+  out.push({ kind: 'daily', n: 20, why: '꾸준히 기록하는 습관' });
+  return out.slice(0, 4);
+}
+
+/* ----- 나만의 배지 만들기: 무엇을 · 어떤 걸 · 얼마나 (한 달 단위) ----- */
+function openBadgeMaker(i) {
+  const b = i != null ? state.badgeDraft[i] : null;
+  state.maker = b ? { ...b, idx: i } : { kind: 'held', cat: '', n: 3, unit: 'count', title: '', idx: null };
+  renderBadgeMaker(); $('#badge-maker').showModal(); document.activeElement.blur();
+}
+// 난이도 숫자: 지난달 내 기록을 기준으로
+function makerLevels(m) {
+  const L = lastMonthStats(), amt = m.unit === 'amount';
+  const used = L.exp.filter(e => !m.cat || e.category === m.cat), base = amt ? used.reduce((s, e) => s + e.amount, 0) : used.length;
+  const r = v => amt ? Math.max(10000, Math.round(v / 10000) * 10000) : Math.max(0, Math.round(v));
+  if (m.kind === 'held') { const h = state.held.filter(x => periodOf(x) === L.key && (!m.cat || x.category === m.cat)); const hb = amt ? h.reduce((s, x) => s + x.amount, 0) : h.length;
+    return [r(Math.max(amt ? 30000 : 1, hb)), r(Math.max(amt ? 50000 : 3, hb + (amt ? 30000 : 2))), r(Math.max(amt ? 100000 : 5, hb + (amt ? 60000 : 4)))]; }
+  if (m.kind === 'reduce') return base ? [r(base * 0.9), r(base * 0.75), r(base * 0.5)] : [amt ? 50000 : 5, amt ? 30000 : 3, amt ? 10000 : 1];
+  if (m.kind === 'sat') { const v = L.sat ?? 50; const c = x => Math.min(95, Math.round(x / 5) * 5); return [c(v), c(v + 5), c(v + 10)]; }
+  if (m.kind === 'regret') return [Math.max(0, L.regret), Math.max(0, L.regret - 1), Math.max(0, L.regret - 2)];
+  if (m.kind === 'daily') return [10, 20, 28];
+  return null;
+}
+function renderBadgeMaker() {
+  const m = state.maker, K = BADGE_KINDS[m.kind], lv = makerLevels(m);
+  if (!K.units.includes(m.unit)) m.unit = K.units[0];
+  if (!K.cat) m.cat = '';
+  $('#bm-kind').innerHTML = Object.entries(BADGE_KINDS).map(([k, v]) => `<button class="chip" data-bmkind="${k}" aria-pressed="${m.kind === k}">${v.icon} ${v.label}</button>`).join('');
+  $('#bm-cat-f').hidden = !K.cat;
+  $('#bm-cat').innerHTML = ['', ...cats('지출')].map(c => `<button class="chip sm" data-bmcat="${esc(c)}" aria-pressed="${m.cat === c}">${c ? esc(c) : '전체'}</button>`).join('');
+  $('#bm-n-f').hidden = !K.units.length;
+  if (K.units.length) {
+    $('#bm-unit').innerHTML = K.units.length > 1 ? K.units.map(u => `<button class="chip sm" data-bmunit="${u}" aria-pressed="${m.unit === u}">${u === 'amount' ? '금액으로' : '횟수로'}</button>`).join('') : '';
+    $('#bm-n').textContent = nfmt(m.n, m.unit);
+    $('#bm-lv').innerHTML = lv ? ['쉬움', '보통', '도전'].map((t, i) => `<button data-bmlv="${lv[i]}" aria-pressed="${m.n === lv[i]}"><b>${t}</b>${nfmt(lv[i], m.unit)}</button>`).join('') : '';
+  }
+  $('#bm-title').placeholder = badgeName({ ...m, title: '' });
+  $('#bm-title').value = m.title || '';
+  $('#bm-prev').innerHTML = `${badgeHtml(m, { fill: 1, done: true })}<span><b>${esc(badgeName(m))}</b><small>이번 달 안에 이루면 받아요</small></span>`;
+}
+function makerStep(dir) {
+  const m = state.maker, s = m.unit === 'amount' ? 10000 : m.unit === 'pct' ? 5 : 1;
+  m.n = Math.max(0, m.n + dir * s); if (m.unit === 'pct') m.n = Math.min(100, m.n);
+  renderBadgeMaker();
+}
+function saveBadgeMaker() {
+  const m = state.maker, { idx, ...b } = m;
+  b.title = $('#bm-title').value.trim();
+  if (idx != null) state.badgeDraft[idx] = { ...state.badgeDraft[idx], ...b };
+  else state.badgeDraft.push({ ...b, id: newId(), origin: 'mine' });
+  $('#badge-maker').close(); renderBadgeEditor();
+}
+
+function openEarned() {
+  const list = earnedBadges();
+  $('#earned-list').innerHTML = list.length ? list.slice().reverse().map(b => `<div>${badgeHtml(b, { fill: 1, done: true })}<small>${esc(badgeName(b))}</small><em>${Number(b.key.slice(5))}월</em></div>`).join('')
+    : '<p class="empty" style="grid-column:1/-1">아직 받은 배지가 없어요</p>';
+  $('#earned').showModal();
+}
+
+/* ================= 첫 화면: 나의 상태 · 월말 결산 ================= */
+// 한 달 결과로 다음 달 모습(병아리 + 장식)과 칭호를 정한다
+function monthStats(key) {
+  const exp = periodEntries(key).filter(e => e.type === '지출'), rv = exp.filter(e => FEELS[e.feel]);
+  const tot = rv.reduce((s, e) => s + e.amount, 0);
+  return { days: new Set([...periodEntries(key), ...state.held.filter(h => periodOf(h) === key)].map(e => e.date)).size,
+    held: state.held.filter(h => periodOf(h) === key).length,
+    sat: tot ? Math.round(rv.filter(e => e.feel === '만족').reduce((s, e) => s + e.amount, 0) / tot * 100) : null,
+    regret: exp.filter(e => e.feel === '후회').length,
+    badges: badgesOf(key).filter(b => badgeProgress(b, key).done).length };
+}
+function monthLook(key) {
+  const s = monthStats(key), deco = ['🌷', '🎀', '👑', '✨'].slice(0, Math.min(4, s.badges)).join('');
+  if (s.days < 5) return { face: '🐣', deco: '', title: '다시 시작하는 병아리' };
+  const title = s.held >= 5 ? '잘 참는 병아리' : s.sat != null && s.sat >= 60 ? '만족 소비 요정'
+    : badgesOf(key).some(b => b.kind === 'review' && badgeProgress(b, key).done) ? '꼼꼼한 리뷰러' : '차곡차곡 병아리';
+  return { face: '🐥', deco, title };
+}
+function renderStatus() {
+  const key = periodOfDate(today()), prev = shiftPeriod(key, -1), m = Number(key.slice(5));
+  const hasPrev = periodEntries(prev).length > 0, look = hasPrev ? monthLook(prev) : { face: '🐣', deco: '', title: '새내기 기록러' };
+  const cur = monthStats(key), last = monthStats(prev), lv = Math.floor(earnedBadges().length / 3) + 1;
+  const { start } = periodRange(key), day = Math.round((parse(today()) - parse(start)) / 864e5) + 1;
+  const [head, sub] = !periodEntries(key).length ? ['이번 달도 같이 시작해 봐요', `${m}월 ${day}일째`]
+    : cur.sat != null && last.sat != null && cur.sat > last.sat ? ['요즘 아주 잘 쓰고 있어요!', `${m}월 ${day}일째 · 만족한 소비가 지난달보다 늘었어요`]
+    : cur.regret > last.regret && cur.regret >= 2 ? ['요즘 좀 지쳤나 봐요', `후회한 소비가 늘었어요 · 천천히 가요`]
+    : cur.held ? ['잘 참고 있어요!', `${m}월 ${day}일째 · 이번 달 ${cur.held}번 참았어요`]
+    : ['차곡차곡 기록 중이에요', `${m}월 ${day}일째`];
+  const list = badgesOf(key), ps = list.map(b => badgeProgress(b, key));
+  // 다음 배지: 아직 못 받은 것 중 가장 많이 찬 것
+  const nextI = ps.map((p, i) => i).filter(i => !ps[i].done && !ps[i].fail).sort((a, b) => ps[b].fill - ps[a].fill)[0];
+  const goal = (state.settings.goals || {})[key] || '';
+  $('#home-status').innerHTML = `<div class="card status">
+    <div class="st-top"><div class="st-face">${look.face}${look.deco ? `<i>${look.deco}</i>` : ''}<span class="st-lv">Lv.${lv}</span></div>
+      <div><p class="st-title">${esc(look.title)}</p><h2>${head}</h2><p class="label" style="margin:0">${sub}</p></div></div>
+    <div class="st-chips"><div><b>${cur.sat != null ? cur.sat + '%' : '–'}</b><small>😊 만족</small></div><div><b>${cur.held}번</b><small>🙌 참음</small></div>
+      <div><b>${ps.filter(p => p.done).length}/${list.length}</b><small>🏅 배지</small></div><div class="warn"><b>${cur.regret}번</b><small>😣 후회</small></div></div>
+    ${nextI != null ? `<div class="st-next"><span>🏅 다음 배지</span><div class="bar"><i style="width:${Math.round(ps[nextI].fill * 100)}%"></i></div><b>${esc(badgeName(list[nextI]))}</b></div>` : ''}
+    <button class="st-goal" data-goal>🎯 ${goal ? esc(goal) : `${m}월 다짐 적기`} <span>✎</span></button></div>`;
+  renderRecap(key, prev, look, hasPrev);
+}
+// 월말 결산: 새 달 첫 7일 동안, 지난달 기록이 있으면 '지난달의 나 → 이번 달의 나'를 보여준다 (닫으면 이 기기에서 안 보임)
+function renderRecap(key, prev, look, hasPrev) {
+  let seen = ''; try { seen = localStorage.getItem('recapSeen') || ''; } catch { /* 무시 */ }
+  const { start } = periodRange(key), day = Math.round((parse(today()) - parse(start)) / 864e5) + 1;
+  if (!hasPrev || day > 7 || seen === key) { $('#home-recap').innerHTML = ''; return; }
+  const before = shiftPeriod(prev, -1), was = periodEntries(before).length ? monthLook(before) : { face: '🐣', deco: '', title: '새내기 기록러' };
+  const a = monthStats(prev), b = monthStats(before), pm = Number(prev.slice(5)), m = Number(key.slice(5));
+  const cmp = (x, y, good) => y == null || x == null ? '' : x === y ? '<small>지난달과 같아요</small>' : `<small class="${(x > y) === good ? 'good' : 'bad'}">지난달 ${y} ${x > y ? '↑' : '↓'}</small>`;
+  $('#home-recap').innerHTML = `<div class="card recap">
+    <div class="card-head" style="margin:0"><h2 style="margin:0">${pm}월 결산 → ${m}월의 나</h2><button class="icon-btn" data-recapclose aria-label="닫기">✕</button></div>
+    <div class="rc-months"><div class="rc-mo"><div class="rc-face">${was.face}${was.deco}</div><b>${pm}월의 나</b><span>${esc(was.title)}</span></div><span class="rc-arrow">→</span>
+      <div class="rc-mo now"><div class="rc-face">${look.face}${look.deco}</div><b>${m}월의 나</b><span>✨ ${esc(look.title)}</span></div></div>
+    <div class="rc-res"><div>😊 만족 <b>${a.sat != null ? a.sat + '%' : '–'}</b>${cmp(a.sat, b.sat, true)}</div><div>🙌 참음 <b>${a.held}번</b>${cmp(a.held, b.held, true)}</div>
+      <div>🏅 받은 배지 <b>${a.badges}개</b>${a.badges ? '<small>장식이 하나씩 붙어요</small>' : ''}</div><div>😣 후회 <b>${a.regret}번</b>${cmp(a.regret, b.regret, false)}</div></div></div>`;
+}
+
 /* ================= 이번 달 목표 ================= */
 function openGoal() {
   state.goalKey = periodOfDate(today());
-  $('#g-title').textContent = `${Number(state.goalKey.slice(5))}월 소비 목표`;
+  $('#g-title').textContent = `${Number(state.goalKey.slice(5))}월 다짐`;
   $('#g-text').value = (state.settings.goals || {})[state.goalKey] || '';
   $('#goal-editor').showModal(); $('#g-text').focus();
 }
@@ -290,15 +557,20 @@ function openHeld(id) {
   $('#h-date').value = h ? h.date : state.calDay || today();
   $('#h-what').value = h ? h.detail : ''; $('#h-how').value = h ? h.memo : '';
   $('#h-amount').value = h && h.amount ? h.amount.toLocaleString('ko-KR') : '';
+  state.heldCat = h ? h.category : ''; renderHeldCats();
   $('#h-actions').innerHTML = (h ? '<button class="btn danger" data-helddel style="width:auto;padding:14px 18px">삭제</button>' : '')
     + '<button class="btn primary" data-heldok>저장</button>';
   $('#held-sheet').showModal();
+}
+// 참은 소비의 카테고리 (배지에서 '배달 참기'처럼 셀 때 씀). 다시 누르면 해제
+function renderHeldCats() {
+  $('#h-cats').innerHTML = cats('지출').map(c => `<button class="chip sm" data-hcat="${esc(c)}" aria-pressed="${state.heldCat === c}">${esc(c)}</button>`).join('');
 }
 function saveHeld() {
   const what = $('#h-what').value.trim();
   if (!what) { toast('무엇을 참았는지 적어 주세요'); return $('#h-what').focus(); }
   const prev = state.heldEditing;
-  const h = { id: prev ? prev.id : newId(), date: $('#h-date').value || today(), type: HELD, category: '', detail: what,
+  const h = { id: prev ? prev.id : newId(), date: $('#h-date').value || today(), type: HELD, category: state.heldCat || '', detail: what,
     memo: $('#h-how').value.trim(), amount: Number($('#h-amount').value.replace(/[^\d]/g, '')) || 0 };
   $('#held-sheet').close();
   store.save(h, prev).catch(err => toast('동기화 실패: ' + errMsg(err)));
@@ -341,7 +613,26 @@ function renderReview() {
 }
 function answerReview(feel) {
   const e = state.rv[state.rvI]; if (!e) return;
+  if (feel === '후회') { state.rvMood = { mood: '', memo: '', open: false }; return renderMoodStep(e); }
   store.save({ ...e, feel }, e).catch(err => toast('동기화 실패: ' + errMsg(err)));
+  state.rvI++; renderReview();
+}
+// 후회 다음 단계: 그때 기분 하나 고르기 (안 골라도 됨) + 한 줄 메모는 눌렀을 때만
+function renderMoodStep(e) {
+  const m = state.rvMood;
+  $('#rv-body').innerHTML = `<div class="rv-prog"><span>소비 리뷰</span><span>${state.rvI + 1} / ${state.rv.length}</span></div>
+    <div class="rv-card"><p class="rv-when">😣 ${esc(e.detail || e.category)} · ${won(e.amount)}</p>
+      <p class="rv-q" style="margin-top:10px">그때 기분이 어땠어요?</p>
+      <div class="mood-chips">${MOODS.map(([t, ic]) => `<button class="chip" data-mood="${t}" aria-pressed="${m.mood === t}">${ic} ${t}</button>`).join('')}</div>
+      ${m.open ? `<textarea class="input mood-memo" id="rv-memo" rows="2" maxlength="80" placeholder="다음엔 어떻게 해 볼까요? (선택)">${esc(m.memo)}</textarea>`
+        : '<button class="link-btn" data-moodmemo>✎ 한 줄 남기기 (선택)</button>'}</div>
+    <div class="actions"><button class="btn primary" data-moodok>다음</button></div>`;
+  if (m.open) $('#rv-memo').focus();
+}
+function saveMood() {
+  const e = state.rv[state.rvI], m = state.rvMood; if (!e) return;
+  if ($('#rv-memo')) m.memo = $('#rv-memo').value.trim();
+  store.save({ ...e, feel: '후회', mood: m.mood, feelMemo: m.memo }, e).catch(err => toast('동기화 실패: ' + errMsg(err)));
   state.rvI++; renderReview();
 }
 
@@ -1203,11 +1494,30 @@ document.addEventListener('click', ev => {
   if (d.budopen !== undefined) { state.budOpen = !state.budOpen; return renderMonth(); }
   if (d.budall !== undefined) { state.budAll = !state.budAll; return renderMonth(); }
   if (d.goal !== undefined) return openGoal();
+  if (d.badgeedit !== undefined) return openBadgeEditor();
+  if (d.badgeall !== undefined) return openEarned();
+  if (d.recapclose !== undefined) { try { localStorage.setItem('recapSeen', periodOfDate(today())); } catch { /* 무시 */ } return renderHome(); }
+  if (d.bemove) { const [i, dir] = d.bemove.split('|').map(Number), L = state.badgeDraft, j = i + dir; if (j >= 0 && j < L.length) [L[i], L[j]] = [L[j], L[i]]; return renderBadgeEditor(); }
+  if (d.bedel !== undefined) { state.badgeDraft.splice(Number(d.bedel), 1); return renderBadgeEditor(); }
+  if (d.beedit !== undefined) return openBadgeMaker(Number(d.beedit));
+  if (d.berec !== undefined) { const { why, ...r } = state.badgeRecs[Number(d.berec)]; state.badgeDraft.push({ ...r, id: newId(), origin: 'rec' }); return renderBadgeEditor(); }
+  if (d.bemake !== undefined) return openBadgeMaker();
+  if (d.besave !== undefined) return saveBadgeEditor();
+  if (d.bmkind) { state.maker.kind = d.bmkind; const lv = makerLevels({ ...state.maker, unit: BADGE_KINDS[d.bmkind].units[0] }); state.maker.unit = BADGE_KINDS[d.bmkind].units[0]; if (lv) state.maker.n = lv[1]; return renderBadgeMaker(); }
+  if (d.bmcat !== undefined) { state.maker.cat = d.bmcat; const lv = makerLevels(state.maker); if (lv) state.maker.n = lv[1]; return renderBadgeMaker(); }
+  if (d.bmunit) { state.maker.unit = d.bmunit; const lv = makerLevels(state.maker); if (lv) state.maker.n = lv[1]; return renderBadgeMaker(); }
+  if (d.bmlv) { state.maker.n = Number(d.bmlv); return renderBadgeMaker(); }
+  if (d.bmstep) return makerStep(Number(d.bmstep));
+  if (d.bmsave !== undefined) return saveBadgeMaker();
   if (d.goalok !== undefined) return saveGoal();
   if (d.review !== undefined) return openReview();
   if (d.feel) return answerReview(d.feel);
+  if (d.mood) { state.rvMood.mood = state.rvMood.mood === d.mood ? '' : d.mood; if ($('#rv-memo')) state.rvMood.memo = $('#rv-memo').value; return renderMoodStep(state.rv[state.rvI]); }
+  if (d.moodmemo !== undefined) { state.rvMood.open = true; return renderMoodStep(state.rv[state.rvI]); }
+  if (d.moodok !== undefined) return saveMood();
   if (d.held !== undefined) return openHeld(d.held);
   if (d.heldok !== undefined) return saveHeld();
+  if (d.hcat !== undefined) { state.heldCat = state.heldCat === d.hcat ? '' : d.hcat; return renderHeldCats(); }
   if (d.helddel !== undefined) return removeHeld();
   if (d.rvcat !== undefined) return toggleReviewCat(d.rvcat);
   if (d.pickok !== undefined) {

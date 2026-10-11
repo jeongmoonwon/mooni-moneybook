@@ -49,7 +49,9 @@
 
   <!-- 홈 -->
   <section class="view on" id="view-home">
-    <div id="home-goal"></div>
+    <div id="home-recap"></div>
+    <div id="home-status"></div>
+    <div id="home-badges"></div>
     <div id="home-review"></div>
     <div id="home-held"></div>
     <div class="card">
@@ -258,14 +260,48 @@
   <div class="sheet-head"><h2 id="h-title">🙌 참은 소비</h2><button class="icon-btn" data-close aria-label="닫기">✕</button></div>
   <div class="field"><p class="label">날짜</p><input class="input" type="date" id="h-date"></div>
   <div class="field"><p class="label">무엇을 참았나요?</p><input class="input" id="h-what" autocomplete="off" maxlength="40"></div>
+  <div class="field"><p class="label">어떤 소비였나요? (선택)</p><div class="chips" id="h-cats"></div></div>
   <div class="field"><p class="label">대신 어떻게 했나요? (선택)</p><input class="input" id="h-how" autocomplete="off" maxlength="60"></div>
   <div class="field"><p class="label">아낀 금액 (선택)</p><input class="input amount num" id="h-amount" inputmode="numeric" placeholder="0" autocomplete="off"></div>
   <div class="actions" id="h-actions"></div>
 </div></dialog>
 
+<!-- 배지 목록 편집 -->
+<dialog id="badge-editor" class="sheet"><div class="body">
+  <div class="sheet-head"><h2>배지 목록 편집</h2><button class="icon-btn" data-close aria-label="닫기">✕</button></div>
+  <p class="note" style="margin:0 0 6px">▲▼로 순서 · ✕로 빼기 · 이름을 누르면 기준 고치기</p>
+  <div id="be-list"></div>
+  <p class="be-sec">내 기록 보고 추천해요</p>
+  <div id="be-recs"></div>
+  <button class="be-make" data-bemake>＋ 나만의 배지 만들기</button>
+  <div class="actions"><button class="btn primary" data-besave>완료</button></div>
+</div></dialog>
+
+<!-- 나만의 배지 만들기 -->
+<dialog id="badge-maker" class="sheet"><div class="body">
+  <div class="sheet-head"><h2>나만의 배지 만들기</h2><button class="icon-btn" data-close aria-label="닫기">✕</button></div>
+  <p class="note" style="margin:0">한 달 안에 이루는 도전이에요. 고르기만 하면 돼요</p>
+  <div class="field"><p class="label">무엇을</p><div class="chips" id="bm-kind"></div></div>
+  <div class="field" id="bm-cat-f"><p class="label">어떤 걸 (선택)</p><div class="chips" id="bm-cat"></div></div>
+  <div class="field" id="bm-n-f"><p class="label">얼마나</p>
+    <div class="chips" id="bm-unit" style="margin-bottom:8px"></div>
+    <div class="bm-stepper"><button class="step" data-bmstep="-1" aria-label="줄이기">−</button><b id="bm-n" class="num"></b><button class="step" data-bmstep="1" aria-label="늘리기">＋</button></div>
+    <div class="bm-lv" id="bm-lv"></div>
+    <p class="note" style="margin-top:6px">쉬움 · 보통 · 도전은 지난달 내 기록으로 계산해요</p></div>
+  <div class="bm-prev" id="bm-prev"></div>
+  <div class="field"><p class="label">이름 (선택)</p><input class="input" id="bm-title" maxlength="20" autocomplete="off"></div>
+  <div class="actions"><button class="btn primary" data-bmsave>저장</button></div>
+</div></dialog>
+
+<!-- 지금까지 받은 배지 -->
+<dialog id="earned" class="sheet"><div class="body">
+  <div class="sheet-head"><h2>지금까지 받은 배지</h2><button class="icon-btn" data-close aria-label="닫기">✕</button></div>
+  <div class="bgrid" id="earned-list"></div>
+</div></dialog>
+
 <!-- 이번 달 목표 -->
 <dialog id="goal-editor"><div class="body">
-  <h2 id="g-title">이번 달 목표</h2>
+  <h2 id="g-title">이번 달 다짐</h2>
   <input class="input" id="g-text" autocomplete="off" maxlength="60">
   <p class="note">앱을 켜면 맨 위에 보여요. 비우고 저장하면 지워져요.</p>
   <div class="actions"><button class="btn ghost" data-close>취소</button><button class="btn primary" data-goalok>저장</button></div>
