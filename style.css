@@ -272,6 +272,9 @@ body.demo .demo-banner{display:block}
 .ce-list{list-style:none;margin:14px 0 0;padding:0;max-height:52vh;overflow:auto}
 .ce-row{display:flex;align-items:center;gap:8px;padding:4px 0}
 .ce-row .input{padding:8px 10px}
+.ce-order{display:flex;flex-direction:column;gap:2px;flex:none}
+.ce-order button{border:0;background:var(--wash);color:var(--t-strong);border-radius:6px;width:26px;height:17px;font-size:9px;line-height:17px;padding:0}
+.ce-order button:disabled{opacity:.3;cursor:default}
 .ce-count{font-size:12px;color:var(--mu);min-width:52px;text-align:right;white-space:nowrap}
 .ce-move{background:var(--wash);border-radius:14px;padding:10px 12px;margin:2px 0 8px;font-size:13px;color:var(--t2)}
 .ce-move select{width:auto;display:inline-block;padding:6px 8px;margin:0 4px}

@@ -517,8 +517,7 @@ function spendPace(key) {
 function budgetHtml(exp) {
   const cb = catBudgetsOf(state.period), map = cb.map, byCat = sumBy(exp, e => e.category);
   const used = c => map[c] || byCat.get(c);
-  const shown = (state.budAll ? cats('지출') : cats('지출').filter(used))
-    .sort((a, b) => (map[b] || 0) - (map[a] || 0) || (byCat.get(b) || 0) - (byCat.get(a) || 0));
+  const shown = state.budAll ? cats('지출') : cats('지출').filter(used); // 카테고리 순서 그대로 (설정 > 카테고리에서 바꿀 수 있음)
   const hidden = cats('지출').filter(c => !used(c)).length;
   state.budCtx = { byCat, avg: cb.avg, M: budScale(map, byCat), spent: exp.reduce((s, e) => s + e.amount, 0) };
   return `<div id="bud-total">${budTotalHtml(map)}</div>
@@ -930,9 +929,11 @@ function renderCats() {
   const counts = new Map();
   for (const e of state.entries) if (e.type === t) counts.set(e.category, (counts.get(e.category) || 0) + 1);
   $('#ce-seg').innerHTML = TYPES.map(x => `<button data-cetype="${x}" aria-pressed="${x === t}">${x}</button>`).join('');
-  $('#ce-list').innerHTML = cats(t).map(c => {
+  const list = cats(t);
+  $('#ce-list').innerHTML = list.map((c, i) => {
     const k = counts.get(c) || 0;
     const row = `<li class="ce-row">
+      <span class="ce-order"><button data-cemove="${i}|-1" aria-label="${esc(c)} 위로" ${i ? '' : 'disabled'}>▲</button><button data-cemove="${i}|1" aria-label="${esc(c)} 아래로" ${i < list.length - 1 ? '' : 'disabled'}>▼</button></span>
       <input class="input ce-name" data-old="${esc(c)}" value="${esc(c)}" maxlength="20" aria-label="${esc(c)} 이름">
       <span class="ce-count num">${k ? k.toLocaleString() + '건' : ''}</span>
       <button class="icon-btn" data-cedel="${esc(c)}" aria-label="${esc(c)} 삭제">
@@ -945,6 +946,16 @@ function renderCats() {
       <span class="row" style="margin-top:8px"><button class="btn danger" id="ce-del-ok" style="padding:8px">삭제</button>
       <button class="btn ghost" id="ce-del-cancel" style="padding:8px">취소</button></span></li>`;
   }).join('');
+}
+
+// 카테고리 순서 바꾸기: 기록 화면 버튼, 한 달 탭 예산 줄 등 카테고리가 나오는 곳 모두 이 순서를 따른다
+function moveCat(i, dir) {
+  const t = state.ceType, list = cats(t).slice(), j = i + dir;
+  if (j < 0 || j >= list.length) return;
+  [list[i], list[j]] = [list[j], list[i]];
+  state.settings.cats = { ...allCats(), [t]: list }; // 저장이 돌아오기 전에도 바로 보이게
+  renderCats();
+  saveCats(t, list);
 }
 
 function saveCats(type, list) {
@@ -1110,6 +1121,7 @@ document.addEventListener('click', ev => {
   if (d.close !== undefined) return b.closest('dialog').close();
   if (d.cetype) { state.ceType = d.cetype; state.ceDelete = null; return renderCats(); }
   if (d.cedel) return deleteCat(d.cedel);
+  if (d.cemove) { const [i, dir] = d.cemove.split('|').map(Number); return moveCat(i, dir); }
   switch (b.id) {
     case 'submit': return submit();
     case 'cancel': resetForm(); return $('#entry-sheet').close();
