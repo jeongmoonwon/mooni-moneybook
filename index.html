@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>mooni의 가계부</title>
-<meta name="theme-color" content="#eef8f4" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0e1714" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#FFF6EE" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#221A17" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="mooni의 가계부">
 <link rel="manifest" href="manifest.webmanifest">
@@ -17,7 +17,8 @@
   try {
     const p = JSON.parse(localStorage.getItem('prefs') || '{}'), r = document.documentElement;
     if (p.theme === 'light' || p.theme === 'dark') r.dataset.theme = p.theme;
-    if (p.font) r.style.setProperty('--kfont', '"' + p.font + '"');
+    if (p.font && p.font !== 'system') r.style.setProperty('--kfont', '"' + p.font + '"');
+    if (p.font === 'system') r.style.setProperty('--kfont', '"Apple SD Gothic Neo"');
   } catch (e) {}
 </script>
 </head>

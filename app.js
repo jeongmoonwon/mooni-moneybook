@@ -1081,15 +1081,15 @@ function confirmDeleteCat() {
 }
 
 /* ================= 화면 모드 · 글씨체 (이 기기에만 저장) ================= */
-const FONTS = [['', '기본'], ['Gowun Dodum', '고운돋움'], ['Poor Story', '푸어스토리'], ['Gaegu', '개구'], ['Hi Melody', '하이멜로디'], ['Gamja Flower', '감자꽃'], ['Jua', '주아']];
-const THEME_BG = { light: '#eef8f4', dark: '#0e1714' };
-function loadPrefs() { try { return { theme: 'system', font: '', ...JSON.parse(localStorage.getItem('prefs') || '{}') }; } catch { return { theme: 'system', font: '' }; } }
+const FONTS = [['Poor Story', '푸어스토리'], ['Gowun Dodum', '고운돋움'], ['Gaegu', '개구'], ['Hi Melody', '하이멜로디'], ['Gamja Flower', '감자꽃'], ['Jua', '주아'], ['system', '기본 (휴대폰 글씨)']];
+const THEME_BG = { light: '#FFF6EE', dark: '#221A17' };
+function loadPrefs() { try { return { theme: 'system', font: 'Poor Story', ...JSON.parse(localStorage.getItem('prefs') || '{}') }; } catch { return { theme: 'system', font: 'Poor Story' }; } }
 let prefs = loadPrefs();
 // 구글 폰트는 고른 글씨체만, 설정을 열었을 때는 미리보기용으로 전부 불러온다
 function loadFont(f) {
   const id = 'font-' + (f || 'all').replace(/\s/g, '');
   if (document.getElementById(id)) return;
-  const fams = (f ? [f] : FONTS.map(([x]) => x).filter(Boolean)).map(x => 'family=' + x.replace(/ /g, '+')).join('&');
+  const fams = (f ? [f, 'Jua'] : FONTS.map(([x]) => x).filter(x => x !== 'system')).map(x => 'family=' + x.replace(/ /g, '+')).join('&');
   const l = document.createElement('link'); l.id = id; l.rel = 'stylesheet';
   l.href = `https://fonts.googleapis.com/css2?${fams}&display=swap`;
   document.head.appendChild(l);
@@ -1097,7 +1097,8 @@ function loadFont(f) {
 function applyPrefs() {
   const r = document.documentElement;
   if (prefs.theme === 'system') delete r.dataset.theme; else r.dataset.theme = prefs.theme;
-  if (prefs.font) { r.style.setProperty('--kfont', `"${prefs.font}"`); loadFont(prefs.font); } else r.style.removeProperty('--kfont');
+  if (prefs.font === 'system' || !prefs.font) { r.style.setProperty('--kfont', '"Apple SD Gothic Neo"'); loadFont('Jua'); }
+  else { r.style.setProperty('--kfont', `"${prefs.font}"`); loadFont(prefs.font); }
   document.querySelectorAll('meta[name="theme-color"]').forEach(m => {
     m.content = prefs.theme === 'system' ? THEME_BG[m.media.includes('dark') ? 'dark' : 'light'] : THEME_BG[prefs.theme];
   });
@@ -1112,7 +1113,7 @@ function renderPrefs() {
   $('#s-theme').innerHTML = [['system', '기기 설정 따라'], ['light', '항상 밝게'], ['dark', '항상 어둡게']]
     .map(([v, t]) => `<button data-pref="theme|${v}" aria-pressed="${prefs.theme === v}">${t}</button>`).join('');
   $('#s-font').innerHTML = FONTS.map(([f, t]) => `<button class="font-opt" data-pref="font|${f}" aria-pressed="${prefs.font === f}"
-    style="font-family:${f ? `'${f}',` : ''}'Apple SD Gothic Neo',sans-serif">${t}<small>오늘 쓴 돈 12,000원</small></button>`).join('');
+    style="font-family:${f !== 'system' ? `'${f}',` : ''}'Apple SD Gothic Neo',sans-serif">${t}<small>오늘 쓴 돈 12,000원</small></button>`).join('');
 }
 applyPrefs();
 
