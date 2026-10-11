@@ -494,22 +494,18 @@ function renderStatus() {
   const hasPrev = periodEntries(prev).length > 0, look = hasPrev ? monthLook(prev) : { face: '🐣', deco: '', title: '새내기 기록러' };
   const cur = monthStats(key), last = monthStats(prev), lv = Math.floor(earnedBadges().length / 3) + 1;
   const { start } = periodRange(key), day = Math.round((parse(today()) - parse(start)) / 864e5) + 1;
-  const [head, sub] = !periodEntries(key).length ? ['이번 달도 같이 시작해 봐요', `${m}월 ${day}일째`]
-    : cur.sat != null && last.sat != null && cur.sat > last.sat ? ['요즘 아주 잘 쓰고 있어요!', `${m}월 ${day}일째 · 만족한 소비가 지난달보다 늘었어요`]
-    : cur.regret > last.regret && cur.regret >= 2 ? ['요즘 좀 지쳤나 봐요', `후회한 소비가 늘었어요 · 천천히 가요`]
-    : cur.held ? ['잘 참고 있어요!', `${m}월 ${day}일째`]
-    : ['차곡차곡 기록 중이에요', `${m}월 ${day}일째`];
   const list = badgesOf(key), ps = list.map(b => badgeProgress(b, key));
   const goal = (state.settings.goals || {})[key] || '', rq = reviewQueue().length;
   $('#home-status').innerHTML = `<div class="card status">
     <div class="st-top"><div class="st-face">${look.face}${look.deco ? `<i>${look.deco}</i>` : ''}<span class="st-lv">Lv.${lv}</span></div>
-      <div><p class="st-title">${esc(look.title)}</p><h2>${head}</h2><p class="label" style="margin:0">${sub}</p></div></div>
+      <div style="flex:1;min-width:0"><p class="st-title">${esc(look.title)} · ${m}월 ${day}일째</p>
+        <button class="st-goal-big${goal ? '' : ' empty'}" data-goal><span class="g-lab">🎯 ${m}월 다짐</span>${goal ? esc(goal) : '이번 달 다짐을 적어 보세요'}</button></div></div>
     <div class="st-chips"><div><b>${cur.sat != null ? cur.sat + '%' : '–'}</b><small>😊 만족</small></div><div><b>${cur.held}번</b><small>🙌 참음</small></div>
       <div><b>${ps.filter(p => p.done).length}/${list.length}</b><small>🏅 배지</small></div><div class="warn"><b>${cur.regret}번</b><small>😣 후회</small></div></div>
     <div class="st-act"><button class="st-rv" data-review ${rq ? '' : 'disabled'}>💭 리뷰하기${rq ? `<span class="st-badge">${rq}</span>` : ''}</button>
       <button class="st-hd" data-held="">🙌 참았어요</button></div>
     ${rq ? '' : '<p class="st-none">지금은 리뷰할 소비가 없어요</p>'}
-    <button class="st-goal" data-goal>🎯 ${goal ? esc(goal) : `${m}월 다짐 적기`} <span>✎</span></button></div>`;
+    </div>`;
   renderRecap(key, prev, look, hasPrev);
 }
 // 월말 결산: 새 달 첫 7일 동안, 지난달 기록이 있으면 '지난달의 나 → 이번 달의 나'를 보여준다 (닫으면 이 기기에서 안 보임)
