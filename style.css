@@ -26,9 +26,23 @@
     --c1:#3987e5; --c2:#d95926; --c3:#199e70; --c4:#c98500; --c5:#d55181; --c-other:#4a5a54;
   }
 }
+/* 설정에서 '항상 어둡게'를 고른 경우 */
+:root[data-theme="dark"]{
+    color-scheme:dark;
+    --page:#0e1714; --card:#16211d; --border:rgba(255,255,255,.08);
+    --t1:#eef6f3; --t2:#b9c8c2; --mu:#86968f; --grid:#24332e; --base:#34463f;
+    --wash:#1f2e29; --ink:#3cc9a0; --ink-2:#33b890; --on-ink:#062a1f; --brand:#3cc9a0;
+    --shadow:none; --t-strong:#5fd6b3;
+    --s1:#e8665f; --s2:#1d9aa2; --s3:#8a74e8; --rest:#34443e;
+    --good:#0ca30c; --bad:#e66767;
+    --up:#e66767; --down:#6da7ec; --income:#3cc9a0;
+    --lv1:#9a3028; --lv2:#c2463b; --lv3:#e6766b; --lv4:#f6b3aa;
+    --cell1:#3a2120; --cell2:#552824; --cell3:#78312a; --cell4:#9c3a30; --ex-ink:#ffb8b0;
+    --c1:#3987e5; --c2:#d95926; --c3:#199e70; --c4:#c98500; --c5:#d55181; --c-other:#4a5a54;
+}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--page);color:var(--t1)}
-body{font:15px/1.45 "Apple SD Gothic Neo","Noto Sans KR",system-ui,-apple-system,"Segoe UI",sans-serif;
+body{font:15px/1.45 var(--kfont,"Apple SD Gothic Neo"),"Apple SD Gothic Neo","Noto Sans KR",system-ui,-apple-system,"Segoe UI",sans-serif;
   padding-bottom:calc(76px + env(safe-area-inset-bottom))}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
@@ -375,6 +389,8 @@ body.demo .demo-banner{display:block}
 .review-card .go{margin-left:auto;font-weight:800;font-size:18px}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .review-card{background:#33290f;border-color:#5a4718;color:#f3d48a!important}
   :root:not([data-theme="light"]) .review-card small{color:#d9bb72}}
+:root[data-theme="dark"] .review-card{background:#33290f;border-color:#5a4718;color:#f3d48a!important}
+:root[data-theme="dark"] .review-card small{color:#d9bb72}
 .held-card{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:18px;padding:12px 16px;margin-bottom:12px;box-shadow:var(--shadow)}
 .held-card .e{font-size:22px}
 .held-card b{display:block;font-size:14px}
@@ -412,3 +428,11 @@ dialog.sheet[open]{animation:sheet-up .22s ease-out}
 .rv-done h2{margin:6px 0 0}
 .sat{display:flex;height:16px;border-radius:999px;overflow:hidden;margin:10px 0 8px;gap:2px}
 .sat-leg{display:flex;justify-content:space-between;font-size:13px}
+
+/* 설정: 화면 모드 · 글씨체 */
+.set-row.stack{display:block}
+.set-row.stack .seg{margin-top:8px;grid-template-columns:repeat(3,1fr)}
+.font-list{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.font-opt{border:1.5px solid var(--border);background:var(--card);border-radius:12px;padding:8px 10px;text-align:left;font-size:15px;color:var(--t1)}
+.font-opt small{display:block;font-size:12px;color:var(--mu)}
+.font-opt[aria-pressed=true]{border-color:var(--ink);background:var(--wash)}

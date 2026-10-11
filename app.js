@@ -1080,6 +1080,42 @@ function confirmDeleteCat() {
   toast(`'${name}' 삭제 · 기록은 '${to}'로 옮겼어요`);
 }
 
+/* ================= 화면 모드 · 글씨체 (이 기기에만 저장) ================= */
+const FONTS = [['', '기본'], ['Gowun Dodum', '고운돋움'], ['Poor Story', '푸어스토리'], ['Gaegu', '개구'], ['Hi Melody', '하이멜로디'], ['Gamja Flower', '감자꽃'], ['Jua', '주아']];
+const THEME_BG = { light: '#eef8f4', dark: '#0e1714' };
+function loadPrefs() { try { return { theme: 'system', font: '', ...JSON.parse(localStorage.getItem('prefs') || '{}') }; } catch { return { theme: 'system', font: '' }; } }
+let prefs = loadPrefs();
+// 구글 폰트는 고른 글씨체만, 설정을 열었을 때는 미리보기용으로 전부 불러온다
+function loadFont(f) {
+  const id = 'font-' + (f || 'all').replace(/\s/g, '');
+  if (document.getElementById(id)) return;
+  const fams = (f ? [f] : FONTS.map(([x]) => x).filter(Boolean)).map(x => 'family=' + x.replace(/ /g, '+')).join('&');
+  const l = document.createElement('link'); l.id = id; l.rel = 'stylesheet';
+  l.href = `https://fonts.googleapis.com/css2?${fams}&display=swap`;
+  document.head.appendChild(l);
+}
+function applyPrefs() {
+  const r = document.documentElement;
+  if (prefs.theme === 'system') delete r.dataset.theme; else r.dataset.theme = prefs.theme;
+  if (prefs.font) { r.style.setProperty('--kfont', `"${prefs.font}"`); loadFont(prefs.font); } else r.style.removeProperty('--kfont');
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => {
+    m.content = prefs.theme === 'system' ? THEME_BG[m.media.includes('dark') ? 'dark' : 'light'] : THEME_BG[prefs.theme];
+  });
+}
+function setPref(key, value) {
+  prefs = { ...prefs, [key]: value };
+  try { localStorage.setItem('prefs', JSON.stringify(prefs)); } catch { /* 저장 못 해도 지금 화면엔 적용 */ }
+  applyPrefs(); renderPrefs();
+  if (state.view === 'trend') renderTrend(); // 그래프 글자 폭이 바뀔 수 있어서
+}
+function renderPrefs() {
+  $('#s-theme').innerHTML = [['system', '기기 설정 따라'], ['light', '항상 밝게'], ['dark', '항상 어둡게']]
+    .map(([v, t]) => `<button data-pref="theme|${v}" aria-pressed="${prefs.theme === v}">${t}</button>`).join('');
+  $('#s-font').innerHTML = FONTS.map(([f, t]) => `<button class="font-opt" data-pref="font|${f}" aria-pressed="${prefs.font === f}"
+    style="font-family:${f ? `'${f}',` : ''}'Apple SD Gothic Neo',sans-serif">${t}<small>오늘 쓴 돈 12,000원</small></button>`).join('');
+}
+applyPrefs();
+
 /* ================= 설정 · 가져오기 ================= */
 function openSettings() {
   $('#s-account').textContent = state.user.email || '';
@@ -1093,6 +1129,7 @@ function openSettings() {
     .map(n => `<option value="${n}" ${n === rv.days ? 'selected' : ''}>${n}일 뒤</option>`).join('');
   renderReviewCats();
   $('#s-import-msg').textContent = '';
+  loadFont(); renderPrefs();
   $('#settings').showModal(); document.activeElement.blur(); // 닫기(✕) 버튼에 포커스 테두리가 생기지 않게
 }
 
@@ -1189,6 +1226,7 @@ document.addEventListener('click', ev => {
   if (d.close !== undefined) return b.closest('dialog').close();
   if (d.cetype) { state.ceType = d.cetype; state.ceDelete = null; return renderCats(); }
   if (d.cedel) return deleteCat(d.cedel);
+  if (d.pref) { const [k, v] = d.pref.split('|'); return setPref(k, v); }
   if (d.cemove) { const [i, dir] = d.cemove.split('|').map(Number); return moveCat(i, dir); }
   switch (b.id) {
     case 'submit': return submit();

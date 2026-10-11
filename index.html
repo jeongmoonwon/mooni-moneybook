@@ -12,6 +12,14 @@
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="stylesheet" href="style.css">
+<script>
+  // 화면 모드·글씨체를 그리기 전에 먼저 적용 (깜빡임 방지). 값은 이 기기에만 저장
+  try {
+    const p = JSON.parse(localStorage.getItem('prefs') || '{}'), r = document.documentElement;
+    if (p.theme === 'light' || p.theme === 'dark') r.dataset.theme = p.theme;
+    if (p.font) r.style.setProperty('--kfont', '"' + p.font + '"');
+  } catch (e) {}
+</script>
 </head>
 <body class="booting">
 
@@ -129,6 +137,14 @@
   <div class="set-row">
     <div><b>'한 달'의 시작일</b><p>이 날부터 다음 달 이 날의 전날까지를 한 달로 봐요. 월급날로 맞추면 편해요</p></div>
     <select class="input" id="s-payday"></select>
+  </div>
+  <div class="set-row stack">
+    <div><b>화면 모드</b><p>'기기 설정 따라'를 고르면 휴대폰이 다크 모드일 때 앱도 어두워져요</p></div>
+    <div class="seg" id="s-theme" role="group" aria-label="화면 모드"></div>
+  </div>
+  <div class="set-row stack">
+    <div><b>글씨체</b><p>이 기기에만 적용돼요</p></div>
+    <div class="font-list" id="s-font"></div>
   </div>
   <div class="set-row">
     <div><b>카테고리</b><p>추가 · 삭제 · 이름 바꾸기 · 순서 바꾸기</p></div>
