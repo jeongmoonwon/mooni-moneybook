@@ -271,7 +271,6 @@ const BADGE_KINDS = {
   reduce: { icon: '📉', color: '#8ED9B4', label: '줄이기', units: ['count', 'amount'], cat: true },
   sat: { icon: '😊', color: '#FFDB6E', label: '만족 비율', units: ['pct'] },
   regret: { icon: '🌱', color: '#B8E0A0', label: '후회 줄이기', units: ['count'] },
-  review: { icon: '📝', color: '#9CC8FF', label: '리뷰 다 하기', units: [] },
   daily: { icon: '🔥', color: '#FFB566', label: '꾸준히 기록', units: ['days'] },
   budget: { icon: '🎯', color: '#F7A3BE', label: '예산 지키기', units: [] },
 };
@@ -279,17 +278,16 @@ const CAT_ICON = { '식비': '🍚', '간식': '🍰', '카공': '☕', '생필�
   '의류': '👕', '미용': '💇', '여행': '✈️', '경조사/선물': '🎁', '가전': '📺', '교통비': '🚌', '통신비': '📱', '월세': '🏠', '배달': '🛵' };
 const BASIC_BADGES = () => [
   { id: 'basic-held', kind: 'held', n: 3, unit: 'count', origin: 'basic' },
-  { id: 'basic-review', kind: 'review', origin: 'basic' },
 ];
 const nfmt = (v, unit) => unit === 'amount' ? compact(v) + '원' : unit === 'pct' ? v + '%' : unit === 'days' ? v + '일' : v + '번';
 function badgeName(b) {
   if (b.title) return b.title;
   const c = b.cat ? b.cat + ' ' : '';
   return { held: `${c}${nfmt(b.n, b.unit)} 참기`, reduce: `${c || '지출 '}${nfmt(b.n, b.unit)} 이하`, sat: `만족 ${b.n}% 넘기기`,
-    regret: `후회 ${b.n}번 이하`, review: '리뷰 다 하기', daily: `${b.n}일 기록하기`, budget: '예산 안에서 쓰기' }[b.kind];
+    regret: `후회 ${b.n}번 이하`, daily: `${b.n}일 기록하기`, budget: '예산 안에서 쓰기' }[b.kind];
 }
 const badgeIcon = b => (b.cat && CAT_ICON[b.cat]) || BADGE_KINDS[b.kind].icon;
-const badgesOf = key => ((state.settings.badges || {})[key] || []);
+const badgesOf = key => ((state.settings.badges || {})[key] || []).filter(b => BADGE_KINDS[b.kind]); // 없어진 종류(예전 '리뷰 다 하기')는 건너뜀
 
 // 진행도: fill(0~1) · label · done(받음) · fail(이번 달은 못 받음)
 function badgeProgress(b, key) {
@@ -319,13 +317,6 @@ function badgeProgress(b, key) {
     return r >= b.n ? (past ? { fill: 1, label: '받았어요', done: true } : { fill: 1, label: `지금 ${r}% · 달성 중` })
       : { fill: r / b.n, label: `지금 ${r}%`, fail: past };
   }
-  if (b.kind === 'review') {
-    const { min, days: d, cats: rc } = reviewCfg(), due = addDays(t, -d);
-    const elig = exp.filter(e => e.amount >= min && (!rc || rc.includes(e.category)) && e.date <= due);
-    const done = elig.filter(e => e.feel).length;
-    if (!elig.length) return past ? { fill: 0, label: '리뷰할 소비가 없었어요', fail: true } : { fill: 0, label: '리뷰할 소비가 생기면' };
-    return done === elig.length && past ? { fill: 1, label: '받았어요', done: true } : { fill: done / elig.length, label: `${done} / ${elig.length}`, fail: past && done < elig.length };
-  }
   if (b.kind === 'daily') {
     const v = new Set([...periodEntries(key), ...state.held.filter(h => periodOf(h) === key)].map(e => e.date)).size;
     return v >= b.n ? { fill: 1, label: '받았어요', done: true } : { fill: v / b.n, label: `${v} / ${b.n}일`, fail: past };
@@ -339,7 +330,7 @@ function ensureMonthBadges() {
   if (all[key] || state.badgeInit === key) return;
   state.badgeInit = key;
   const prevKey = Object.keys(all).filter(k => k < key).sort().at(-1);
-  const carry = prevKey ? all[prevKey].filter(b => b.origin !== 'basic' && !badgeProgress(b, prevKey).done)
+  const carry = prevKey ? badgesOf(prevKey).filter(b => b.origin !== 'basic' && !badgeProgress(b, prevKey).done)
     .map(b => ({ ...b, id: newId(), origin: 'carry', from: prevKey })) : [];
   saveBadges(key, [...BASIC_BADGES(), ...carry]);
 }
@@ -349,7 +340,7 @@ function saveBadges(key, list) {
 }
 function earnedBadges() {
   const all = state.settings.badges || {}, out = [];
-  for (const k of Object.keys(all).sort()) for (const b of all[k]) if (badgeProgress(b, k).done) out.push({ ...b, key: k });
+  for (const k of Object.keys(all).sort()) for (const b of badgesOf(k)) if (badgeProgress(b, k).done) out.push({ ...b, key: k });
   return out;
 }
 
@@ -389,7 +380,7 @@ function renderBadgeEditor() {
     : '<p class="note" style="margin:4px 0 0">지금은 추천할 배지가 없어요. 기록이 더 쌓이면 보여드릴게요</p>';
   state.badgeRecs = recs;
 }
-const badgeDesc = b => [BADGE_KINDS[b.kind].label, b.cat, b.n != null && b.kind !== 'review' && b.kind !== 'budget' ? nfmt(b.n, b.unit || BADGE_KINDS[b.kind].units[0]) : ''].filter(Boolean).join(' · ');
+const badgeDesc = b => [BADGE_KINDS[b.kind].label, b.cat, b.n != null && b.kind !== 'budget' ? nfmt(b.n, b.unit || BADGE_KINDS[b.kind].units[0]) : ''].filter(Boolean).join(' · ');
 function saveBadgeEditor() {
   saveBadges(periodOfDate(today()), state.badgeDraft);
   $('#badge-editor').close(); renderHome(); toast('배지 목록을 저장했어요');
@@ -482,11 +473,17 @@ function monthStats(key) {
     regret: exp.filter(e => e.feel === '후회').length,
     badges: badgesOf(key).filter(b => badgeProgress(b, key).done).length };
 }
+// 그 달 리뷰 대상 지출(기준 금액 이상)을 하나도 빠짐없이 리뷰했는지 (칭호 '꼼꼼한 리뷰러')
+function allReviewed(key) {
+  const { min, cats: rc } = reviewCfg();
+  const elig = periodEntries(key).filter(e => e.type === '지출' && e.amount >= min && (!rc || rc.includes(e.category)));
+  return elig.length >= 3 && elig.every(e => e.feel);
+}
 function monthLook(key) {
   const s = monthStats(key), deco = ['🌷', '🎀', '👑', '✨'].slice(0, Math.min(4, s.badges)).join('');
   if (s.days < 5) return { face: '🐣', deco: '', title: '다시 시작하는 병아리' };
   const title = s.held >= 5 ? '잘 참는 병아리' : s.sat != null && s.sat >= 60 ? '만족 소비 요정'
-    : badgesOf(key).some(b => b.kind === 'review' && badgeProgress(b, key).done) ? '꼼꼼한 리뷰러' : '차곡차곡 병아리';
+    : allReviewed(key) ? '꼼꼼한 리뷰러' : '차곡차곡 병아리';
   return { face: '🐥', deco, title };
 }
 function renderStatus() {
