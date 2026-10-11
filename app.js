@@ -259,7 +259,17 @@ function renderHome() {
     <button class="chip sm" data-held="">+ 참았어요</button></div>`;
 
   renderPeriodNav();
+  renderCalSum();
   renderCalendar();
+}
+
+// 홈 달력 위: 보고 있는 달의 수입·지출 합계 (이번 달이면 오늘까지)
+function renderCalSum() {
+  const { start, end } = periodRange(state.period), t = today(), live = t >= start && t <= end;
+  const list = state.entries.filter(e => e.date >= start && e.date <= (live ? t : end));
+  const sum = type => list.filter(e => e.type === type).reduce((s, e) => s + e.amount, 0);
+  $('#cal-sum').innerHTML = `<span class="cs-lab">${live ? '오늘까지' : '이 달'}</span>
+    <span>수입 <b class="num in">+${won(sum('수입'))}</b></span><span>지출 <b class="num ex">−${won(sum('지출'))}</b></span>`;
 }
 
 /* ================= 이번 달 목표 ================= */

@@ -223,6 +223,10 @@ button.title:active{background:var(--wash)}
 .cal .in{font-size:10px;color:var(--income);font-weight:700}
 .cal .sun .d{color:var(--bad)}
 .cal-nav{margin:-4px 0 8px}
+.cal-sum{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;background:var(--wash);border-radius:12px;padding:8px 12px;margin-bottom:10px;font-size:13px;color:var(--t2)}
+.cal-sum .cs-lab{font-size:11px;color:var(--mu)}
+.cal-sum b.in{color:var(--income)}
+.cal-sum b.ex{color:var(--t1)}
 .cal-nav .step{width:36px;height:36px;border-radius:12px;font-size:16px}
 .cal-nav .title b{font-size:17px}
 .hol-name{color:var(--bad);font-weight:600}
