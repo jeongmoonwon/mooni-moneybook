@@ -554,16 +554,7 @@ function budgetHtml(exp) {
     : `<p class="bud-note good">예산보다 ${won(rest)} 덜 썼어요</p>`;
   else if (!budget) note = '<p class="bud-note">예산을 정하면 남은 돈과 하루에 쓸 수 있는 돈을 알려줘요</p>';
 
-  let cmp = '';
-  const pace = state.pace, avg = pace ? pace.avg('지출') : 0;
-  if (avg) {
-    const p = Math.round((spent - avg) / avg * 100);
-    cmp = `<p class="bud-cmp">${live ? `지금까지(${now + 1}일째)` : '이 달'} 쓴 돈 <b class="num">${won(spent)}</b> ·
-      최근 ${pace.n}개월 ${live ? '같은 기간 ' : ''}평균 ${won(avg)}보다
-      <b class="chg num ${p > 0 ? 'up' : p < 0 ? 'down' : ''}">${p > 0 ? `▲${p}%` : p < 0 ? `▼${-p}%` : '–0%'}</b></p>`;
-  } else if (live) cmp = '<p class="bud-cmp">지난 달 지출 기록이 쌓이면, 같은 기간끼리 비교해서 ▲▼를 보여줘요</p>';
-
-  return `<div class="bud-top">${top}</div>${cmp}
+  return `<div class="bud-top">${top}</div>
     <svg class="bud-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="날짜별 누적 지출">${g}</svg>
     <div class="bud-legend"><span><i class="k-cum"></i>쓴 돈(누적)</span>${budget ? '<span><i class="k-pace"></i>고르게 쓸 때</span><span><i class="k-bud"></i>예산</span>' : ''}</div>
     ${note}`;
