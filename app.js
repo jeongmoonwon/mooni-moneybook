@@ -637,24 +637,26 @@ function reviewQueue() {
     && e.amount >= min && (!rc || rc.includes(e.category))).sort((a, b) => a.date.localeCompare(b.date));
 }
 function openReview() {
-  state.rv = reviewQueue(); state.rvI = 0;
+  state.rv = reviewQueue(); state.rvI = 0; state.rvLater = 0;
   renderReview(); $('#review').showModal(); document.activeElement.blur(); // 첫 버튼에 포커스 테두리가 생기지 않게
 }
 function renderReview() {
   const e = state.rv[state.rvI];
   if (!e) {
-    $('#rv-body').innerHTML = `<div class="rv-done"><span>👏</span><h2>다 돌아봤어요</h2><p class="note">한 달 탭에서 이번 달 소비 만족도를 볼 수 있어요</p>
+    const later = state.rvLater;
+    $('#rv-body').innerHTML = `<div class="rv-done"><span>👏</span><h2>${later === state.rv.length ? '다음에 다시 물어볼게요' : '다 돌아봤어요'}</h2>
+      <p class="note">${later ? `나중에로 넘긴 ${later}개는 다음에 리뷰하기를 누르면 다시 나와요<br>` : ''}한 달 탭에서 이번 달 소비 만족도를 볼 수 있어요</p>
       <div class="actions"><button class="btn ghost" data-close>닫기</button><button class="btn primary" data-view="month">만족도 보기</button></div></div>`;
     return;
   }
   const d = parse(e.date), ago = Math.round((parse(today()) - d) / 864e5);
-  $('#rv-body').innerHTML = `<div class="rv-prog"><span>소비 리뷰</span><span>${state.rvI + 1} / ${state.rv.length}</span></div>
+  $('#rv-body').innerHTML = `<div class="rv-prog"><span>소비 리뷰 · ${state.rvI + 1} / ${state.rv.length}</span><button class="icon-btn" data-close aria-label="리뷰 그만하기">✕</button></div>
     <div class="rv-card"><p class="rv-when">${d.getMonth() + 1}월 ${d.getDate()}일 (${WD[d.getDay()]}) · ${ago}일 전</p>
       <h3>${esc(e.detail || e.category)}</h3><span class="rv-cat">지출 · ${esc(e.category)}</span>
       <div class="rv-amt num">${won(e.amount)}</div>
       <p class="rv-q">지금 돌아보니 어때요?</p>
       <div class="rv-choices">${Object.entries(FEELS).map(([f, ic]) => `<button data-feel="${f}"><span>${ic}</span>${f}</button>`).join('')}</div></div>
-    <div class="actions"><button class="btn ghost" data-close>나중에</button><button class="btn ghost" data-feel="skip">이건 안 물어보기</button></div>`;
+    <div class="actions"><button class="btn ghost" data-rvlater>이건 나중에</button><button class="btn ghost" data-feel="skip">이건 안 물어보기</button></div>`;
 }
 function answerReview(feel) {
   const e = state.rv[state.rvI]; if (!e) return;
@@ -665,7 +667,7 @@ function answerReview(feel) {
 // 후회 다음 단계: 그때 기분 하나 고르기 (안 골라도 됨) + 한 줄 메모는 눌렀을 때만
 function renderMoodStep(e) {
   const m = state.rvMood;
-  $('#rv-body').innerHTML = `<div class="rv-prog"><span>소비 리뷰</span><span>${state.rvI + 1} / ${state.rv.length}</span></div>
+  $('#rv-body').innerHTML = `<div class="rv-prog"><span>소비 리뷰 · ${state.rvI + 1} / ${state.rv.length}</span><button class="icon-btn" data-close aria-label="리뷰 그만하기">✕</button></div>
     <div class="rv-card"><p class="rv-when">😣 ${esc(e.detail || e.category)} · ${won(e.amount)}</p>
       <p class="rv-q" style="margin-top:10px">그때 기분이 어땠어요?</p>
       <div class="mood-chips">${moods().map(([t, ic]) => `<button class="chip" data-mood="${t}" aria-pressed="${m.mood === t}">${ic} ${t}</button>`).join('')}</div>
@@ -1628,6 +1630,7 @@ document.addEventListener('click', ev => {
   if (d.mood) { state.rvMood.mood = state.rvMood.mood === d.mood ? '' : d.mood; if ($('#rv-memo')) state.rvMood.memo = $('#rv-memo').value; return renderMoodStep(state.rv[state.rvI]); }
   if (d.moodmemo !== undefined) { state.rvMood.open = true; return renderMoodStep(state.rv[state.rvI]); }
   if (d.moodok !== undefined) return saveMood();
+  if (d.rvlater !== undefined) { state.rvI++; state.rvLater++; return renderReview(); } // 이 항목만 건너뛰고 다음으로 (저장 안 함 → 다음에 다시 나옴)
   if (d.held !== undefined) return openHeld(d.held);
   if (d.heldok !== undefined) return saveHeld();
   if (d.hcat !== undefined) { state.heldCat = state.heldCat === d.hcat ? '' : d.hcat; return renderHeldCats(); }

@@ -415,7 +415,7 @@ dialog.sheet[open]{animation:sheet-up .22s ease-out}
 .sheet-head .icon-btn{font-size:16px;color:var(--mu)}
 
 /* 소비 리뷰 */
-.rv-prog{display:flex;justify-content:space-between;font-size:12px;color:var(--mu);margin-bottom:10px}
+.rv-prog{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--mu);margin:-6px -6px 6px 0}
 .rv-card{text-align:center;padding:4px 0 2px}
 .rv-when{font-size:12px;color:var(--mu);margin:0}
 .rv-card h3{margin:8px 0 6px;font-size:22px}
