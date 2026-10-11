@@ -84,14 +84,14 @@
   <!-- 추이 -->
   <section class="view" id="view-trend">
     <div class="seg seg-2" id="trend-seg" role="group" aria-label="볼 항목" style="margin-bottom:10px"></div>
-    <div class="chips scroll" id="trend-cats" role="group" aria-label="카테고리" style="margin-bottom:10px"></div>
-    <div id="trend-range" style="margin-bottom:14px"></div>
+    <div class="chips scroll" id="trend-cats" role="group" aria-label="카테고리" style="margin-bottom:14px"></div>
     <div class="card">
       <div class="card-head" style="margin:0 0 4px">
         <h2 style="margin:0" id="trend-title">월별 지출</h2>
         <span class="trend-legend"><span class="tl-line"></span><span id="trend-leg-name">지출</span> <span class="tl-base"></span>평소 <span class="tl-peak"></span>피크</span>
       </div>
-      <p class="label" id="trend-sub"></p>
+      <button class="range-btn" id="trend-sub" data-trangetoggle aria-expanded="false"></button>
+      <div class="range-panel" id="trend-range" hidden></div>
       <div class="trend">
         <svg class="trend-axis" id="trend-axis" aria-hidden="true"></svg>
         <div class="trend-scroll" id="trend-scroll" tabindex="0" aria-label="월별 지출 그래프, 옆으로 밀어서 이전 달 보기">

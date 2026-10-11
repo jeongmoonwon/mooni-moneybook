@@ -77,7 +77,7 @@ let store = null;
 const state = {
   user: null, entries: [], held: [], settings: { payday: 25 }, pending: false,
   view: 'home', type: '지출', category: '식비', date: today(), editing: null, heldEditing: null, rv: [], rvI: 0,
-  period: null, calDay: today(), trendType: '지출', trendCat: '', trendRange: 'year', trendFrom: '', trendTo: '', fltType: '', fltCat: '', q: '', visible: [],
+  period: null, calDay: today(), trendType: '지출', trendCat: '', trendRange: 'year', trendFrom: '', trendTo: '', trendRangeOpen: false, fltType: '', fltCat: '', q: '', visible: [],
   info: false, ceType: '지출', ceDelete: null, calc: '', split: null,
 };
 function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
@@ -724,7 +724,7 @@ const TREND_TYPES = {
   '수입': { color: 'var(--income)', peak: 'var(--income)', verb: '들어온', top: '가장 큰 수입' },
 };
 
-// 볼 기간: 최근 1년(12개월) · 전체 · 직접 선택(시작 달 ~ 끝 달)
+// 볼 기간: 최근 1년(12개월) · 전체 · 직접 선택(시작 달 ~ 끝 달). 그래프 제목 아래 기간 글자를 누르면 펼쳐짐
 function trendRangeSlice(all) {
   const ks = all.map(d => d.k), r = state.trendRange;
   if (ks.length && (!ks.includes(state.trendFrom) || !ks.includes(state.trendTo))) { // 처음이거나 범위 밖이면 최근 1년으로 채움
@@ -732,6 +732,7 @@ function trendRangeSlice(all) {
   }
   const fmt = k => `${k.slice(0, 4)}년 ${Number(k.slice(5))}월`;
   const opts = sel => ks.map(k => `<option value="${k}" ${k === sel ? 'selected' : ''}>${fmt(k)}</option>`).join('');
+  $('#trend-range').hidden = !state.trendRangeOpen;
   $('#trend-range').innerHTML = `<div class="seg seg-3">${[['year', '최근 1년'], ['all', '전체'], ['custom', '직접 선택']]
     .map(([v, t]) => `<button data-trange="${v}" aria-pressed="${v === r}">${t}</button>`).join('')}</div>
     ${r === 'custom' && ks.length ? `<div class="range-pick"><select class="input" id="tr-from" aria-label="시작 달">${opts(state.trendFrom)}</select>
@@ -758,7 +759,7 @@ function renderTrend() {
   const H = 236, T = 26, B = 34, COL = 44, PAD = 18;
   const ph = H - T - B;
   if (!data.length) {
-    $('#trend-sub').textContent = '';
+    $('#trend-sub').innerHTML = '';
     $('#trend-axis').innerHTML = ''; $('#trend-chart').innerHTML = '';
     $('#trend-detail').innerHTML = `<p class="empty">${cat ? '이 카테고리' : type} 기록이 쌓이면 그래프가 그려져요</p>`;
     return;
@@ -771,7 +772,8 @@ function renderTrend() {
   const X = i => n > 1 ? PAD + col * i : W / 2, Y = v => T + ph * (1 - v / max);
   const peaks = data.filter(d => d.peak).length;
   const label = k => `${k.slice(2, 4)}.${Number(k.slice(5))}`;
-  $('#trend-sub').textContent = `${label(data[0].k)} ~ ${label(data.at(-1).k)} · ${data.length}개월`;
+  $('#trend-sub').innerHTML = `${{ year: '최근 1년', all: '전체', custom: '직접 선택' }[state.trendRange]} · ${label(data[0].k)} ~ ${label(data.at(-1).k)} · ${data.length}개월 <i>${state.trendRangeOpen ? '▴' : '▾'}</i>`;
+  $('#trend-sub').setAttribute('aria-expanded', state.trendRangeOpen);
 
   const ticks = []; for (let v = 0; v <= max; v += step) ticks.push(v);
   $('#trend-axis').setAttribute('viewBox', `0 0 40 ${H}`);
@@ -1072,6 +1074,7 @@ document.addEventListener('click', ev => {
   }
   if (d.pshift) { state.period = shiftPeriod(state.period, Number(d.pshift)); state.calDay = null; return refreshAll(); }
   if (d.trendtype) { state.trendType = d.trendtype; state.trendCat = ''; state.trendSel = null; state.trendScrolled = false; return renderTrend(); }
+  if (d.trangetoggle !== undefined) { state.trendRangeOpen = !state.trendRangeOpen; return renderTrend(); }
   if (d.trange) { state.trendRange = d.trange; state.trendSel = null; state.trendScrolled = false; return renderTrend(); }
   if (d.trendcat !== undefined) { state.trendCat = d.trendcat; return renderTrend(); }
   if (d.addday) return addOnDay(d.addday);

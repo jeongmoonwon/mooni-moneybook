@@ -299,7 +299,13 @@ body.demo .demo-banner{display:block}
 #view-trend{--series:var(--s1);--peak:var(--up)}
 .seg.seg-2{grid-template-columns:repeat(2,1fr)}
 .seg.seg-3{grid-template-columns:repeat(3,1fr)}
+.range-btn{border:0;background:none;padding:2px 0;margin:0 0 6px;font-size:12px;color:var(--mu);display:inline-flex;align-items:center;gap:4px}
+.range-btn i{font-style:normal;font-size:11px}
+.range-btn[aria-expanded=true]{color:var(--t-strong);font-weight:700}
+.range-panel{background:var(--wash);border-radius:14px;padding:8px;margin:2px 0 8px}
+.range-panel .seg{background:var(--card);padding:3px}
 #trend-range .seg button{padding:7px 0;font-size:13px}
+.range-panel .seg button[aria-pressed=true]{background:var(--ink);color:var(--on-ink);box-shadow:none}
 .range-pick{display:flex;align-items:center;gap:8px;margin-top:8px}
 .range-pick select{flex:1;min-width:0;padding:9px 10px}
 .range-pick span{color:var(--mu)}
