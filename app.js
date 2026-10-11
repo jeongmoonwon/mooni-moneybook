@@ -294,10 +294,10 @@ function renderReviewCats() {
   $('#s-rv-cats').innerHTML = `<button class="chip sm" data-rvcat="" aria-pressed="${!rc}">전체</button>`
     + cats('지출').map(c => `<button class="chip sm" data-rvcat="${esc(c)}" aria-pressed="${!rc || rc.includes(c)}">${esc(c)}</button>`).join('');
 }
-// '전체'를 누르면 모두 선택. 카테고리를 누르면 켜고 끄기 (다 켜지면 다시 '전체')
+// '전체'를 누르면 모두 켜기 ↔ 모두 끄기. 카테고리를 누르면 하나씩 켜고 끄기 (다 켜지면 다시 '전체')
 function toggleReviewCat(c) {
-  const all = cats('지출'), cur = reviewCfg().cats || all;
-  let next = c === '' ? null : cur.includes(c) ? cur.filter(x => x !== c) : [...cur, c];
+  const all = cats('지출'), rc = reviewCfg().cats, cur = rc || all;
+  let next = c === '' ? (rc ? null : []) : cur.includes(c) ? cur.filter(x => x !== c) : [...cur, c];
   if (next && all.every(x => next.includes(x))) next = null;
   state.settings.review = { ...reviewCfg(), cats: next }; // 화면 먼저 바꾸고 저장은 뒤에서
   renderReviewCats();
@@ -922,7 +922,7 @@ function openSettings() {
     .map(n => `<option value="${n}" ${n === rv.days ? 'selected' : ''}>${n}일 뒤</option>`).join('');
   renderReviewCats();
   $('#s-import-msg').textContent = '';
-  $('#settings').showModal();
+  $('#settings').showModal(); document.activeElement.blur(); // 닫기(✕) 버튼에 포커스 테두리가 생기지 않게
 }
 
 function parseCsv(text) {
@@ -1038,7 +1038,7 @@ $('#flt-cat').addEventListener('change', e => { state.fltCat = e.target.value; r
 $('#flt-q').addEventListener('input', e => { state.q = e.target.value; renderList(); });
 $('#s-payday').addEventListener('change', e => {
   store.saveSettings({ payday: Number(e.target.value) }).catch(err => toast('설정 저장 실패: ' + errMsg(err)));
-  toast('월급일을 바꿨어요');
+  toast('한 달 시작일을 바꿨어요');
 });
 $('#s-title').addEventListener('change', e => {
   const title = e.target.value.trim(); // 비우면 기본 이름으로 돌아감

@@ -30,7 +30,6 @@
 
 <header><div class="wrap">
   <h1><img class="logo" src="icons/icon-192.png" alt=""><span id="app-title">mooni의 가계부</span></h1>
-  <span id="sync" aria-live="polite"></span>
   <button class="icon-btn" id="open-settings" aria-label="설정">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
   </button>
@@ -117,9 +116,9 @@
 
 <!-- 설정 -->
 <dialog id="settings"><div class="body">
-  <h2>설정</h2>
+  <div class="sheet-head" style="margin-bottom:12px"><h2>설정</h2><button class="icon-btn" data-close aria-label="닫기">✕</button></div>
   <div class="set-row">
-    <div><b>계정</b><p id="s-account"></p></div>
+    <div><b>계정</b><p id="s-account"></p><p id="sync" aria-live="polite"></p></div>
     <button class="chip" id="sign-out">로그아웃</button>
   </div>
   <div class="set-row">
@@ -127,7 +126,7 @@
     <input class="input" id="s-title" maxlength="20" autocomplete="off" placeholder="mooni의 가계부" style="width:150px">
   </div>
   <div class="set-row">
-    <div><b>월급일</b><p>이 날부터 다음 월급 전날까지를 한 달로 봐요</p></div>
+    <div><b>'한 달'의 시작일</b><p>이 날부터 다음 달 이 날의 전날까지를 한 달로 봐요. 월급날로 맞추면 편해요</p></div>
     <select class="input" id="s-payday"></select>
   </div>
   <div class="set-row">
