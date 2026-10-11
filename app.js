@@ -809,10 +809,10 @@ function budgetHtml(exp) {
   const cb = catBudgetsOf(state.period), map = cb.map, byCat = sumBy(exp, e => e.category);
   state.budCtx = { byCat, avg: cb.avg, spent: exp.reduce((s, e) => s + e.amount, 0) };
   return `<div id="bud-total">${budTotalHtml(map)}</div>
-    ${sumOf(map) ? catSpendSection(map, byCat) : ''}
-    ${catPieHtml(byCat)}`;
+    ${catPieHtml(byCat)}
+    ${sumOf(map) ? catSpendSection(map, byCat) : ''}`;
 }
-// 총 예산 막대 아래 '지출 카테고리별로 보기': 예산 대비 쓴 비율이 높은 순서로 같은 모양의 막대
+// 원그래프 아래 '지출 카테고리별로 보기': 예산 대비 쓴 비율이 높은 순서로 같은 모양의 막대
 function catSpendSection(map, byCat) {
   const open = state.budOpen;
   if (!open) return '<button class="cb-toggle" data-budopen aria-expanded="false"><span>지출 카테고리별로 보기</span><i>펼치기 ▾</i></button>';
