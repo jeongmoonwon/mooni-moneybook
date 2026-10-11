@@ -579,3 +579,9 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 .cs-row .tb-track{display:block;height:10px}
 .cs-row .tb-track i{display:block}
 .cb-fill.bud{background:var(--ink)}
+
+/* 설정: 기분 목록 */
+.mood-item{display:inline-flex;align-items:center;gap:4px}
+.mood-item button{border:0;background:none;color:var(--mu);font-size:11px;padding:0 0 0 2px}
+
+#form-actions .btn{white-space:nowrap}

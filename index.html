@@ -169,6 +169,14 @@
     <div><b>소비 리뷰 카테고리</b><p>고른 카테고리의 지출만 물어봐요</p></div>
     <div class="chips" id="s-rv-cats" style="margin-top:8px"></div>
   </div>
+  <div class="set-row stack">
+    <div><b>후회할 때 기분</b><p>리뷰에서 후회를 고르면 나오는 목록이에요. ✕로 빼고 아래에서 더해요</p></div>
+    <div class="chips" id="s-moods" style="margin-top:8px"></div>
+    <div class="row" style="margin-top:8px;display:flex;gap:8px">
+      <input class="input" id="s-mood-new" maxlength="12" autocomplete="off" placeholder="예: 😴 졸려서">
+      <button class="chip" data-moodadd style="white-space:nowrap">추가</button>
+    </div>
+  </div>
   <div class="set-row">
     <div><b>CSV 가져오기</b><p>내보낸 CSV나 이전 내역 파일을 불러와요</p></div>
     <label class="chip" style="white-space:nowrap">파일 선택<input type="file" id="s-import" accept=".csv" hidden></label>
@@ -254,6 +262,13 @@
       <div class="field">
         <p class="label">메모 (선택)</p>
         <input class="input" id="f-memo" autocomplete="off">
+      </div>
+
+      <div class="field" id="f-feel-f" hidden>
+        <p class="label">리뷰 (돌아보니 어땠나요?)</p>
+        <div class="chips" id="f-feel"></div>
+        <div class="chips" id="f-mood" style="margin-top:8px"></div>
+        <p class="note" id="f-feel-note" style="margin-top:6px"></p>
       </div>
 
       <div class="actions" id="form-actions"></div>

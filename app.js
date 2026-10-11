@@ -110,6 +110,20 @@ function renderForm() {
        <button class="btn primary" id="submit">수정 저장</button>`
     : `<button class="btn primary" id="submit">저장</button>`;
   renderSuggest();
+  renderFormFeel();
+}
+
+// 기록 수정 창의 '리뷰' 줄: 예전에 고른 만족 · 필수 · 후회를 바꾸고, 후회면 그때 기분도 고칠 수 있게
+function renderFormFeel() {
+  const show = !!state.editing && state.type === '지출';
+  $('#f-feel-f').hidden = !show;
+  if (!show) return;
+  const f = FEELS[state.formFeel] ? state.formFeel : '';
+  $('#f-feel').innerHTML = Object.entries(FEELS).map(([k, ic]) => `<button class="chip sm" data-ffeel="${k}" aria-pressed="${f === k}">${ic} ${k}</button>`).join('')
+    + (f ? '<button class="chip sm ghost-chip" data-ffeel="">리뷰 지우기</button>' : '');
+  $('#f-mood').hidden = f !== '후회';
+  $('#f-mood').innerHTML = f === '후회' ? moods().map(([t, ic]) => `<button class="chip sm" data-fmood="${esc(t)}" aria-pressed="${state.formMood === t}">${ic} ${esc(t)}</button>`).join('') : '';
+  $('#f-feel-note').textContent = f ? '' : '아직 리뷰하지 않았어요. 여기서 바로 골라도 돼요';
 }
 
 // 전체 기간 기록에서 이 카테고리 상세내역의 사용 횟수가 많은 순
@@ -191,7 +205,7 @@ function amountValue() { return Number($('#f-amount').value.replace(/[^\d]/g, ''
 function setAmount(n) { $('#f-amount').value = n ? n.toLocaleString('ko-KR') : ''; }
 
 function resetForm() {
-  state.editing = null;
+  state.editing = null; state.formFeel = ''; state.formMood = '';
   toggleCalc(false);
   $('#f-detail').value = ''; setAmount(0); $('#f-memo').value = '';
   renderForm();
@@ -207,9 +221,10 @@ function openEntry(day) {
 function startEdit(id) {
   const e = state.entries.find(x => x.id === id); if (!e) return;
   state.editing = e; state.type = e.type; state.category = e.category; state.date = e.date;
+  state.formFeel = e.feel || ''; state.formMood = e.mood || '';
   $('#f-detail').value = e.detail; setAmount(e.amount); $('#f-memo').value = e.memo || '';
   renderForm();
-  if (!$('#entry-sheet').open) $('#entry-sheet').showModal();
+  if (!$('#entry-sheet').open) { $('#entry-sheet').showModal(); document.activeElement.blur(); }
 }
 
 // 저장하면 화면에는 바로 반영되고, 클라우드 동기화는 뒤에서 진행된다 (오프라인이면 연결될 때까지 대기).
@@ -220,8 +235,14 @@ function submit() {
   const e = {
     id: prev ? prev.id : newId(), date: $('#f-date').value || today(),
     type: state.type, category: state.category,
-    detail: $('#f-detail').value.trim(), amount, memo: $('#f-memo').value.trim(), feel: prev && prev.feel,
+    detail: $('#f-detail').value.trim(), amount, memo: $('#f-memo').value.trim(),
   };
+  // 리뷰 결과 (수정할 때만 고칠 수 있음). 지출이 아니게 바뀌면 리뷰는 지움
+  if (prev && state.type === '지출') {
+    const f = state.formFeel;
+    if (f && f !== 'none') e.feel = f; // 'none' = 리뷰 지우기 (feel 없이 저장)
+    if (f === '후회') { if (state.formMood) e.mood = state.formMood; if (prev.feelMemo) e.feelMemo = prev.feelMemo; }
+  }
   state.date = state.calDay = e.date;
   resetForm();
   $('#entry-sheet').close();
@@ -242,6 +263,8 @@ const HELD = '참음'; // 참은 소비는 기록과 같은 곳에 이 구분으
 const FEELS = { '필수': '🧾', '만족': '😊', '후회': '😣' };
 // 후회를 고르면 한 번 더 묻는 그때 기분 (타이핑 없이 톡)
 const MOODS = [['지쳐서', '😩'], ['스트레스', '😤'], ['심심해서', '🥱'], ['들떠서', '🎉'], ['분위기상', '🤝'], ['늦은 밤', '🌙']];
+const moods = () => state.settings.moods || MOODS; // 설정에서 추가·삭제한 목록 (없으면 기본)
+const moodIcon = m => (moods().find(([t]) => t === m) || MOODS.find(([t]) => t === m) || [])[1] || '💭';
 
 function renderHome() {
   const key = periodOfDate(today());
@@ -607,7 +630,7 @@ function renderMoodStep(e) {
   $('#rv-body').innerHTML = `<div class="rv-prog"><span>소비 리뷰</span><span>${state.rvI + 1} / ${state.rv.length}</span></div>
     <div class="rv-card"><p class="rv-when">😣 ${esc(e.detail || e.category)} · ${won(e.amount)}</p>
       <p class="rv-q" style="margin-top:10px">그때 기분이 어땠어요?</p>
-      <div class="mood-chips">${MOODS.map(([t, ic]) => `<button class="chip" data-mood="${t}" aria-pressed="${m.mood === t}">${ic} ${t}</button>`).join('')}</div>
+      <div class="mood-chips">${moods().map(([t, ic]) => `<button class="chip" data-mood="${t}" aria-pressed="${m.mood === t}">${ic} ${t}</button>`).join('')}</div>
       ${m.open ? `<textarea class="input mood-memo" id="rv-memo" rows="2" maxlength="80" placeholder="다음엔 어떻게 해 볼까요? (선택)">${esc(m.memo)}</textarea>`
         : '<button class="link-btn" data-moodmemo>✎ 한 줄 남기기 (선택)</button>'}</div>
     <div class="actions"><button class="btn primary" data-moodok>다음</button></div>`;
@@ -618,6 +641,27 @@ function saveMood() {
   if ($('#rv-memo')) m.memo = $('#rv-memo').value.trim();
   store.save({ ...e, feel: '후회', mood: m.mood, feelMemo: m.memo }, e).catch(err => toast('동기화 실패: ' + errMsg(err)));
   state.rvI++; renderReview();
+}
+
+// 설정: 후회할 때 기분 목록 추가 · 삭제 (예전 기록에 남은 기분은 그대로 보여요)
+function renderMoodSettings() {
+  $('#s-moods').innerHTML = moods().map(([t, ic], i) => `<span class="chip sm mood-item">${ic} ${esc(t)}<button data-mooddel="${i}" aria-label="${esc(t)} 삭제">✕</button></span>`).join('');
+}
+function saveMoods(list) {
+  state.settings.moods = list; renderMoodSettings();
+  store.saveSettings({ moods: list }).catch(err => toast('설정 저장 실패: ' + errMsg(err)));
+}
+function addMood() {
+  const raw = $('#s-mood-new').value.trim(); if (!raw) return $('#s-mood-new').focus();
+  const m = raw.match(/^(\p{Extended_Pictographic}[\uFE0F\u200D\p{Extended_Pictographic}]*)\s*(.+)$/u); // "😴 졸려서"처럼 앞에 이모지가 있으면 아이콘으로
+  const [t, ic] = m ? [m[2].trim(), m[1]] : [raw, '💭'];
+  if (moods().some(([x]) => x === t)) { toast('이미 있는 기분이에요'); return; }
+  $('#s-mood-new').value = '';
+  saveMoods([...moods(), [t, ic]]);
+}
+function removeMood(i) {
+  const list = moods().slice(); list.splice(i, 1);
+  saveMoods(list);
 }
 
 function saveReviewCfg(patch) {
@@ -757,7 +801,7 @@ function renderLookback(exp, held) {
   const by = sumBy(done, e => e.feel), pct = f => total ? Math.round((by.get(f) || 0) / total * 100) + '%' : '–';
   const regret = done.filter(e => e.feel === '후회').sort((a, b) => b.amount - a.amount);
   const moods = new Map(); for (const e of regret) if (e.mood) moods.set(e.mood, (moods.get(e.mood) || 0) + 1);
-  const topMood = [...moods].sort((a, b) => b[1] - a[1])[0], moodIc = m => (MOODS.find(([t]) => t === m) || [])[1] || '';
+  const topMood = [...moods].sort((a, b) => b[1] - a[1])[0], moodIc = moodIcon;
   const saved = held.reduce((s, h) => s + h.amount, 0), open = state.lookOpen || {};
   const regretItem = e => itemHtml(e).replace('</div></div>', `${e.mood ? ` <span class="cat">· ${moodIc(e.mood)} ${esc(e.mood)}</span>` : ''}${e.feelMemo ? `<div class="cat">“${esc(e.feelMemo)}”</div>` : ''}</div></div>`);
   const fold = (k, title, list, html, empty) => `<button class="lb-fold" data-lookfold="${k}" aria-expanded="${!!open[k]}"><span>${title}</span><i>${list.length ? (open[k] ? '접기 ▴' : '펼치기 ▾') : ''}</i></button>
@@ -1418,7 +1462,7 @@ function openSettings() {
   $('#s-rv-min').value = rv.min ? rv.min.toLocaleString('ko-KR') : '';
   $('#s-rv-days').innerHTML = Array.from({ length: 30 }, (_, i) => i + 1)
     .map(n => `<option value="${n}" ${n === rv.days ? 'selected' : ''}>${n}일 뒤</option>`).join('');
-  renderReviewCats();
+  renderReviewCats(); renderMoodSettings();
   $('#s-import-msg').textContent = '';
   loadFont(); renderPrefs();
   $('#settings').showModal(); document.activeElement.blur(); // 닫기(✕) 버튼에 포커스 테두리가 생기지 않게
@@ -1540,6 +1584,10 @@ document.addEventListener('click', ev => {
   if (d.setok !== undefined) return applySettings();
   if (d.pieetc) { state.pieEtc = !state.pieEtc; return renderMonth(); }
   if (d.lookfold) { state.lookOpen = { ...state.lookOpen, [d.lookfold]: !(state.lookOpen || {})[d.lookfold] }; return renderMonth(); }
+  if (d.ffeel !== undefined) { state.formFeel = d.ffeel || 'none'; if (d.ffeel !== '후회') state.formMood = ''; return renderFormFeel(); }
+  if (d.fmood !== undefined) { state.formMood = state.formMood === d.fmood ? '' : d.fmood; return renderFormFeel(); }
+  if (d.mooddel !== undefined) return removeMood(Number(d.mooddel));
+  if (d.moodadd !== undefined) return addMood();
   if (d.pref) { const [k, v] = d.pref.split('|'); return setPref(k, v); }
   if (d.cemove) { const [i, dir] = d.cemove.split('|').map(Number); return moveCat(i, dir); }
   switch (b.id) {
@@ -1567,6 +1615,7 @@ $('#s-rv-min').addEventListener('change', () => saveReviewCfg({ min: rvMinValue(
 $('#s-rv-min').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
 $('#s-rv-days').addEventListener('change', e => saveReviewCfg({ days: Number(e.target.value) }));
 $('#g-text').addEventListener('keydown', e => { if (e.key === 'Enter') saveGoal(); });
+$('#s-mood-new').addEventListener('keydown', e => { if (e.key === 'Enter') addMood(); });
 $('#f-amount').addEventListener('input', () => setAmount(amountValue()));
 $('#budget-editor').addEventListener('pointerdown', budDragStart);
 $('#b-amount').addEventListener('input', e => { const n = Number(e.target.value.replace(/[^\d]/g, '')); e.target.value = n ? n.toLocaleString('ko-KR') : ''; $('#b-slider').value = n; paintBudgetSlider(); });
