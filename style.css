@@ -192,8 +192,6 @@ button.title:active{background:var(--wash)}
 .cal-legend .mu{color:var(--mu)}
 .cal .in{font-size:10px;color:var(--income);font-weight:700}
 .cal .sun .d{color:var(--bad)}
-.cal-mode.seg{display:flex;width:max-content;margin:-6px 0 2px auto;padding:3px;gap:2px;border-radius:10px}
-.cal-mode.seg button{padding:3px 12px;font-size:12px;border-radius:8px}
 .cal-nav{margin:-4px 0 8px}
 .cal-nav .step{width:36px;height:36px;border-radius:12px;font-size:16px}
 .cal-nav .title b{font-size:17px}
