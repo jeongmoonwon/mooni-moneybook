@@ -423,8 +423,9 @@ function renderMonth() {
   state.pace = spendPace(state.period);
   const byType = sumBy(list, e => e.type);
   const notes = [
-    '예산은 지출 카테고리마다 정하고, 모두 더한 게 총 예산이에요. 저축·투자는 아래 카드에 따로 보여줘요.',
-    '예산을 정하지 않은 달은 직전에 정한 달의 예산을, 한 번도 안 정했으면 최근 12개월 평균을 기본으로 써요.',
+    '전체 예산을 정하면 모든 지출 카테고리에 똑같이 나눠 넣어요. 그 뒤 카테고리별로 조정하면 총 예산도 같이 바뀌어요. 저축·투자는 들어가지 않아요.',
+    '예산을 정하지 않은 달은 직전에 정한 달의 예산을 그대로 써요.',
+    '원그래프 가운데 %는 최근 12개월 같은 기간(첫날~오늘과 같은 일째) 평균보다 얼마나 더/덜 썼는지예요.',
     '지출과 지출 카테고리의 ▲▼는 최근 12개월 각 달의 같은 기간(첫날~오늘과 같은 일째) 지출 평균과 비교해요. 지난 달을 볼 때는 달 전체끼리 비교해요.',
     state.base.n ? `▲▼ 최근 1년(${state.base.n}개월) 월평균 대비예요. <span class="up">▲ 늘어남</span> · <span class="down">▼ 줄어듦</span>` : '▲▼ 비교할 최근 1년 기록이 아직 없어요.',
     '수입·지출 모두 실제 날짜가 이 기간 안에 있는 기록만 계산해요.',
@@ -433,6 +434,7 @@ function renderMonth() {
     <div class="card-head">
       <h2 style="margin:0">${state.period === periodOfDate(today()) ? '이번 달 ' : ''}예산</h2>
       <div style="display:flex;align-items:center;gap:4px">
+        ${sumOf(catBudgetsOf(state.period).map) ? `<button class="chip sm bud-edit" data-budget>전체 ${compact(sumOf(catBudgetsOf(state.period).map))}원 ✎</button>` : ''}
         <button class="icon-btn info-btn" id="info" aria-label="계산 기준 보기" aria-expanded="${state.info}">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="7.8" r=".6" fill="currentColor"/></svg>
         </button>
@@ -479,8 +481,8 @@ function renderHeldCard(held) {
       : '<p class="empty" style="padding:4px 0">사려다 참은 게 있으면 기록해 보세요</p>'}`;
 }
 
-// 카테고리별 예산: 달마다 정한다. 그 달에 안 정했으면 직전에 정한 달의 값을, 그것도 없는 카테고리는
-// 최근 12개월 월평균(기록 있는 달 기준, 1만원 단위 반올림)을 기본값으로 쓴다. 총 예산 = 카테고리 예산의 합
+// 카테고리별 예산: 달마다 정한다. 전체 예산을 정하면 모든 카테고리에 똑같이 나눠 넣고(openBudget),
+// 그 뒤 카테고리마다 손잡이로 조정한다. 그 달에 안 정했으면 직전에 정한 달의 값을 쓴다. 총 예산 = 카테고리 예산의 합
 function catAverages(key) {
   const b = baseline(key);
   return Object.fromEntries(cats('지출').map(c => [c, Math.round(b.avg('지출|' + c) / 10000) * 10000]));
@@ -488,8 +490,8 @@ function catAverages(key) {
 function catBudgetsOf(key) {
   const all = state.settings.catBudgets || {};
   const prevKey = Object.keys(all).filter(k => k < key).sort().at(-1);
-  const base = all[key] || (prevKey && all[prevKey]) || {}, avg = catAverages(key);
-  return { map: Object.fromEntries(cats('지출').map(c => [c, c in base ? base[c] : avg[c]])), avg };
+  const base = all[key] || (prevKey && all[prevKey]) || {}, avg = catAverages(key); // avg는 막대 눈금 정할 때만 씀
+  return { map: Object.fromEntries(cats('지출').map(c => [c, base[c] || 0])), avg };
 }
 const sumOf = map => Object.values(map).reduce((a, b) => a + b, 0);
 
@@ -516,17 +518,20 @@ function spendPace(key) {
 // '카테고리별 예산'을 펼치면 카테고리마다 예산 대비 쓴 돈. 동그란 손잡이를 끌면 바로 예산이 바뀌고 저장된다
 function budgetHtml(exp) {
   const cb = catBudgetsOf(state.period), map = cb.map, byCat = sumBy(exp, e => e.category);
-  const used = c => map[c] || byCat.get(c);
-  const shown = state.budAll ? cats('지출') : cats('지출').filter(used); // 카테고리 순서 그대로 (설정 > 카테고리에서 바꿀 수 있음)
-  const hidden = cats('지출').filter(c => !used(c)).length;
   state.budCtx = { byCat, avg: cb.avg, spent: exp.reduce((s, e) => s + e.amount, 0) };
-  const open = state.budOpen;
   return `<div id="bud-total">${budTotalHtml(map)}</div>
     ${catPieHtml(byCat)}
-    <button class="cb-toggle" data-budopen aria-expanded="${!!open}"><span>카테고리별 예산</span><i>${open ? '접기 ▴' : '펼치기 ▾'}</i></button>
+    ${sumOf(map) ? catBudgetsSection(map, byCat) : ''}`;
+}
+
+function catBudgetsSection(map, byCat) {
+  const used = c => map[c] || byCat.get(c), open = state.budOpen;
+  const shown = state.budAll ? cats('지출') : cats('지출').filter(used); // 카테고리 순서 그대로 (설정 > 카테고리에서 바꿀 수 있음)
+  const hidden = cats('지출').filter(c => !used(c)).length;
+  return `<button class="cb-toggle" data-budopen aria-expanded="${!!open}"><span>카테고리별 예산</span><i>${open ? '접기 ▴' : '펼치기 ▾'}</i></button>
     ${open ? `<div class="cb-list">${shown.map(c => cbRowHtml(c, map[c] || 0)).join('')}</div>
       <div class="cb-foot">${hidden || state.budAll ? `<button class="chip sm" data-budall>${state.budAll ? '쓰는 카테고리만 보기' : `카테고리 ${hidden}개 더 보기`}</button>` : '<span></span>'}
-        <button class="chip sm" data-budavg>최근 12개월 평균으로 맞추기</button></div>
+        <button class="chip sm" data-budget>전체 예산 다시 나누기</button></div>
       <p class="cb-hint">● 손잡이를 좌우로 끌어서 예산을 정해요 · 막대 끝은 카테고리마다 달라요</p>` : ''}`;
 }
 
@@ -549,10 +554,20 @@ function catPieHtml(byCat) {
   return `<div class="pie">
     <svg viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="카테고리별 지출 비율">
       <g transform="rotate(-90 64 64)">${arcs}</g>
-      <text x="64" y="60" text-anchor="middle" class="p-top">쓴 돈</text><text x="64" y="78" text-anchor="middle" class="p-val">${compact(total)}</text></svg>
+      ${paceText(total)}</svg>
     <ul class="pie-leg">${parts.map(p => `<li${p.c === '기타' ? ` title="${esc(p.etc)}"` : ` data-jump="지출|${esc(p.c)}"`}>
       <i style="background:${p.color}"></i><span class="n">${esc(p.c)}</span><span class="v num">${compact(p.v)}</span><b class="num">${Math.round(p.v / total * 100)}%</b></li>`).join('')}</ul>
   </div>`;
+}
+
+// 원그래프 가운데: 쓴 돈 + 평소 이맘때(최근 12개월 같은 기간 평균) 대비 %
+function paceText(total) {
+  const pace = state.pace, avg = pace ? pace.avg('지출') : 0;
+  const p = avg ? Math.round((total - avg) / avg * 100) : null;
+  const tip = avg ? `<title>평소 ${pace.live ? '이맘때' : ''} ${won(avg)} (최근 ${pace.n}개월 ${pace.live ? `${pace.k}일째까지 ` : ''}평균)</title>` : '';
+  if (p === null) return `<text x="64" y="60" text-anchor="middle" class="p-top">쓴 돈</text><text x="64" y="78" text-anchor="middle" class="p-val">${compact(total)}</text>`;
+  return `<g>${tip}<text x="64" y="52" text-anchor="middle" class="p-top">쓴 돈</text><text x="64" y="69" text-anchor="middle" class="p-val">${compact(total)}</text>
+    <text x="64" y="85" text-anchor="middle" class="p-cmp ${p > 0 ? 'up' : p < 0 ? 'down' : ''}">평소보다 ${p > 0 ? '▲' : p < 0 ? '▼' : ''}${Math.abs(p)}%</text></g>`;
 }
 
 // 카테고리마다 자기 눈금: 최근 12개월 평균의 2배(쓴 돈·예산이 더 크면 그만큼)를 1·2·5 단위로 올림.
@@ -563,28 +578,31 @@ function catScale(b, s, avg) {
 }
 
 function budTotalHtml(map) {
-  const { start, end } = periodRange(state.period), t = today(), live = t >= start && t <= end;
+  const { end } = periodRange(state.period), t = today();
   const budget = sumOf(map), spent = state.budCtx.spent, rest = budget - spent;
-  const top = budget
-    ? `<div><p class="label">${rest >= 0 ? '남은 예산' : '예산 초과'}</p><div class="hero num ${rest < 0 ? 'over' : ''}">${rest < 0 ? '−' : ''}${won(Math.abs(rest))}</div></div>
-       ${live ? `<div class="bud-side"><p class="label">하루에</p><b class="num">${won(Math.max(rest, 0) / (Math.round((parse(end) - parse(t)) / 864e5) + 1))}</b></div>` : ''}`
-    : `<div><p class="label">쓴 돈</p><div class="hero num">${won(spent)}</div></div>`;
-  const bar = budget ? `<div class="tb"><div class="tb-track"><i style="width:${Math.min(100, spent / budget * 100)}%" class="${rest < 0 ? 'over' : ''}"></i></div>
-    <div class="tb-lab"><span>쓴 돈 <b class="num">${won(spent)}</b></span><span>총 예산 <b class="num">${won(budget)}</b></span></div></div>` : '';
+  if (!budget) return `<div class="bud-top"><div><p class="label">쓴 돈</p><div class="hero num">${won(spent)}</div></div></div>
+    <button class="btn ghost bud-set" data-budget>이번 달 예산 정하기</button>`;
+  const note = t > end ? (rest < 0 ? `<p class="bud-note bad">예산보다 ${won(-rest)} 더 썼어요</p>` : `<p class="bud-note good">예산보다 ${won(rest)} 덜 썼어요</p>`) : '';
+  return `<div class="bud-top"><div><p class="label">${rest >= 0 ? '남은 예산' : '예산 초과'}</p><div class="hero num ${rest < 0 ? 'over' : ''}">${rest < 0 ? '−' : ''}${won(Math.abs(rest))}</div></div></div>
+    <div class="tb"><div class="tb-track"><i style="width:${Math.min(100, spent / budget * 100)}%" class="${rest < 0 ? 'over' : ''}"></i></div>
+    <div class="tb-lab"><span>쓴 돈 <b class="num">${won(spent)}</b></span><span>총 예산 <b class="num">${won(budget)}</b></span></div></div>${note}`;
+}
 
-  // 평소 이맘때(최근 12개월 같은 기간 평균)와 비교한 한 줄. 차이가 3% 안쪽이면 비슷하다고만
-  let cmp = '';
-  const pace = state.pace, avg = pace ? pace.avg('지출') : 0;
-  if (avg && spent) {
-    const diff = spent - avg, p = Math.round(diff / avg * 100), when = live ? '평소 이맘때' : '평소';
-    const tip = `최근 ${pace.n}개월 ${live ? `같은 기간(${pace.k}일째까지) ` : ''}평균 ${won(avg)}`;
-    cmp = Math.abs(p) < 3
-      ? `<p class="bud-cmp" title="${tip}">${when}와 비슷하게 ${live ? '쓰고 있어요' : '썼어요'}</p>`
-      : `<p class="bud-cmp ${diff > 0 ? 'up' : 'down'}" title="${tip}">${when}보다 <b>${compact(Math.abs(diff))}원 ${diff > 0 ? '더' : '덜'}</b> ${live ? '쓰고 있어요' : '썼어요'}
-          <span>${diff > 0 ? '▲' : '▼'}${Math.abs(p)}%</span></p>`;
-  }
-  const note = budget && t > end ? (rest < 0 ? `<p class="bud-note bad">예산보다 ${won(-rest)} 더 썼어요</p>` : `<p class="bud-note good">예산보다 ${won(rest)} 덜 썼어요</p>`) : '';
-  return `<div class="bud-top">${top}</div>${bar}${cmp}${note}`;
+// 전체 예산 정하기: 입력한 금액을 모든 지출 카테고리에 똑같이 나눠 넣는다 (천원 단위, 남는 돈은 첫 카테고리에)
+function openBudget() {
+  const [y, m] = state.period.split('-').map(Number), v = sumOf(catBudgetsOf(state.period).map);
+  $('#b-title').textContent = `${y}년 ${m}월 전체 예산`;
+  $('#b-amount').value = v ? v.toLocaleString('ko-KR') : '';
+  $('#budget-editor').showModal(); $('#b-amount').focus();
+}
+function saveBudget() {
+  const v = Number($('#b-amount').value.replace(/[^\d]/g, ''));
+  if (!v) { toast('예산을 입력해 주세요'); return $('#b-amount').focus(); }
+  const cs = cats('지출'), each = Math.floor(v / cs.length / 1000) * 1000;
+  const map = Object.fromEntries(cs.map((c, i) => [c, i ? each : v - each * (cs.length - 1)]));
+  $('#budget-editor').close();
+  saveCatBudgets(map);
+  toast(`카테고리 ${cs.length}개에 ${compact(each)}원씩 나눴어요`);
 }
 
 function cbRowHtml(c, b, M) {
@@ -606,11 +624,6 @@ function saveCatBudgets(map) {
   state.settings.catBudgets = { ...state.settings.catBudgets, [state.period]: map }; // 저장이 돌아오기 전에도 바로 보이게
   renderMonth();
   store.saveSettings({ catBudgets: state.settings.catBudgets }).catch(err => toast('예산 저장 실패: ' + errMsg(err)));
-}
-function budToAverage() {
-  if (!confirm('모든 카테고리 예산을 최근 12개월 평균으로 바꿀까요?')) return;
-  saveCatBudgets({ ...catAverages(state.period) });
-  toast('최근 12개월 평균으로 맞췄어요');
 }
 
 // 손잡이 끌기: 끄는 동안은 그 줄과 맨 위 합계만 고쳐서 손가락을 놓치지 않게 하고, 놓으면 저장
@@ -1128,7 +1141,8 @@ document.addEventListener('click', ev => {
   if (d.add !== undefined) { setAmount(d.add === '0' ? 0 : amountValue() + Number(d.add)); return; }
   if (d.shift) { state.date = addDays($('#f-date').value || today(), Number(d.shift)); return renderForm(); }
   if (d.pickmonth !== undefined) return openMonthPicker();
-  if (d.budavg !== undefined) return budToAverage();
+  if (d.budget !== undefined) return openBudget();
+  if (d.budgetok !== undefined) return saveBudget();
   if (d.budopen !== undefined) { state.budOpen = !state.budOpen; return renderMonth(); }
   if (d.budall !== undefined) { state.budAll = !state.budAll; return renderMonth(); }
   if (d.goal !== undefined) return openGoal();
@@ -1183,6 +1197,8 @@ $('#s-rv-days').addEventListener('change', e => saveReviewCfg({ days: Number(e.t
 $('#g-text').addEventListener('keydown', e => { if (e.key === 'Enter') saveGoal(); });
 $('#f-amount').addEventListener('input', () => setAmount(amountValue()));
 $('#summary').addEventListener('pointerdown', budDragStart);
+$('#b-amount').addEventListener('input', e => { const n = Number(e.target.value.replace(/[^\d]/g, '')); e.target.value = n ? n.toLocaleString('ko-KR') : ''; });
+$('#b-amount').addEventListener('keydown', e => { if (e.key === 'Enter') saveBudget(); });
 $('#f-amount').addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
 $('#flt-type').addEventListener('change', e => { state.fltType = e.target.value; renderList(); });
 $('#flt-cat').addEventListener('change', e => { state.fltCat = e.target.value; renderList(); });
