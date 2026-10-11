@@ -356,25 +356,26 @@ function baseline(key) {
 }
 
 // 월평균 대비 변화: ▲ 12% / ▼ 8% / 신규
-function chg(cur, k) {
-  const b = state.base;
-  if (!b.n || !cur) return '<span class="chg"></span>';
-  const avg = b.avg(k);
+// base: 비교 기준 { n: 비교한 달 수, avg(키) }. 기본은 최근 1년 월평균, 지출은 같은 기간 평균(spendPace)
+function chg(cur, k, base = state.base, label = '최근 1년 월평균') {
+  if (!base || !base.n || !cur) return '<span class="chg"></span>';
+  const avg = base.avg(k);
   if (!avg) return '<span class="chg" title="최근 1년 기록 없음">신규</span>';
   const p = Math.round((cur - avg) / avg * 100);
   const txt = p > 0 ? `▲${p}%` : p < 0 ? `▼${-p}%` : '–0%';
-  return `<span class="chg num ${p > 0 ? 'up' : p < 0 ? 'down' : ''}" title="최근 1년 월평균 ${won(avg)}">${txt}</span>`;
+  return `<span class="chg num ${p > 0 ? 'up' : p < 0 ? 'down' : ''}" title="${label} ${won(avg)}">${txt}</span>`;
 }
 
 function renderMonth() {
   renderPeriodNav();
   const list = periodEntries(state.period);
   state.base = baseline(state.period);
+  state.pace = spendPace(state.period);
   const byType = sumBy(list, e => e.type);
   const notes = [
     '예산은 지출만 계산해요. 저축·투자는 아래 카드에 따로 보여줘요.',
     '예산을 정하지 않은 달은 직전에 정한 달의 예산을 그대로 써요.',
-    '지출 ▲▼는 최근 12개월 각 달의 같은 기간(첫날~오늘과 같은 일째) 지출 평균과 비교해요. 지난 달을 볼 때는 달 전체끼리 비교해요.',
+    '지출과 지출 카테고리의 ▲▼는 최근 12개월 각 달의 같은 기간(첫날~오늘과 같은 일째) 지출 평균과 비교해요. 지난 달을 볼 때는 달 전체끼리 비교해요.',
     state.base.n ? `▲▼ 최근 1년(${state.base.n}개월) 월평균 대비예요. <span class="up">▲ 늘어남</span> · <span class="down">▼ 줄어듦</span>` : '▲▼ 비교할 최근 1년 기록이 아직 없어요.',
     '수입·지출 모두 실제 날짜가 이 기간 안에 있는 기록만 계산해요.',
   ];
@@ -398,7 +399,9 @@ function renderMonth() {
       <b class="num">${won(byType.get(t) || 0)}</b>${chg(byType.get(t) || 0, t)}</div>`).join('');
 
   const exp = list.filter(e => e.type === '지출');
-  $('#cat-bars').innerHTML = barsHtml(sumBy(exp, e => e.category), 'var(--s1)', '지출');
+  const pace = state.pace;
+  $('#cat-bars').innerHTML = barsHtml(sumBy(exp, e => e.category), 'var(--s1)', '지출', pace,
+    pace && pace.live ? `최근 ${pace.n}개월 같은 기간(${pace.k}일째까지) 평균` : `최근 ${pace ? pace.n : 0}개월 평균`);
   const sv = list.filter(e => e.type === '저축' || e.type === '투자');
   $('#save-bars').innerHTML = barsHtml(sumBy(sv, e => e.type + '|' + e.category), null, null);
   renderFeel(list.filter(e => e.type === '지출'));
@@ -441,15 +444,21 @@ function budgetOf(key) {
 
 // 지출 비교: 보고 있는 달의 첫날부터 k일째까지 쓴 돈을, 직전 12개월 각 달의 같은 기간(첫날~k일째) 지출 평균과 비교.
 // 달 전체 평균과 비교하면 달 초에는 늘 적게 나오니, 같은 날짜까지끼리 비교한다. 기록이 하나도 없는 달은 평균에서 뺀다.
-function spendPace(key, k) {
-  const sums = [];
+// 지난 달을 볼 때는 k = 그 달 일수(달 전체끼리 비교). 아직 시작 안 한 달은 null.
+function spendPace(key) {
+  const { start, end } = periodRange(key), t = today();
+  if (t < start) return null;
+  const k = Math.round((parse(t > end ? end : t) - parse(start)) / 864e5) + 1;
+  const sums = new Map(); let n = 0;
   for (let i = 1; i <= 12; i++) {
     const p = shiftPeriod(key, -i), list = periodEntries(p);
     if (!list.length) continue;
-    const { start, end } = periodRange(p), until = [addDays(start, k - 1), end].sort()[0];
-    sums.push(list.filter(e => e.type === '지출' && e.date <= until).reduce((s, e) => s + e.amount, 0));
+    n++;
+    const r = periodRange(p), until = [addDays(r.start, k - 1), r.end].sort()[0];
+    for (const e of list) if (e.type === '지출' && e.date <= until)
+      for (const kk of ['지출', '지출|' + e.category]) sums.set(kk, (sums.get(kk) || 0) + e.amount);
   }
-  return sums.length ? { avg: sums.reduce((a, b) => a + b, 0) / sums.length, n: sums.length } : null;
+  return { n, k, live: t <= end, avg: kk => n ? (sums.get(kk) || 0) / n : 0 };
 }
 
 // 예산 카드: 남은 예산 + 날짜별 누적 지출 선 vs 예산을 고르게 쓸 때의 선. 이번 달이면 이 속도로 월말에 얼마가 될지 예상
@@ -496,13 +505,13 @@ function budgetHtml(exp) {
   else if (!budget) note = '<p class="bud-note">예산을 정하면 남은 돈과 하루에 쓸 수 있는 돈을 알려줘요</p>';
 
   let cmp = '';
-  const pace = now >= 0 ? spendPace(state.period, live ? now + 1 : days) : null;
-  if (pace && pace.avg) {
-    const p = Math.round((spent - pace.avg) / pace.avg * 100);
+  const pace = state.pace, avg = pace ? pace.avg('지출') : 0;
+  if (avg) {
+    const p = Math.round((spent - avg) / avg * 100);
     cmp = `<p class="bud-cmp">${live ? `지금까지(${now + 1}일째)` : '이 달'} 쓴 돈 <b class="num">${won(spent)}</b> ·
-      최근 ${pace.n}개월 ${live ? '같은 기간 ' : ''}평균 ${won(pace.avg)}보다
+      최근 ${pace.n}개월 ${live ? '같은 기간 ' : ''}평균 ${won(avg)}보다
       <b class="chg num ${p > 0 ? 'up' : p < 0 ? 'down' : ''}">${p > 0 ? `▲${p}%` : p < 0 ? `▼${-p}%` : '–0%'}</b></p>`;
-  }
+  } else if (live) cmp = '<p class="bud-cmp">지난 달 지출 기록이 쌓이면, 같은 기간끼리 비교해서 ▲▼를 보여줘요</p>';
 
   return `<div class="bud-top">${top}</div>${cmp}
     <svg class="bud-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="날짜별 누적 지출">${g}</svg>
@@ -524,7 +533,7 @@ function saveBudget() {
   store.saveSettings({ budgets: { ...state.settings.budgets, [state.budgetKey]: v } }).catch(err => toast('예산 저장 실패: ' + errMsg(err)));
 }
 
-function barsHtml(map, color, type) {
+function barsHtml(map, color, type, base, label) {
   const rows = [...map].sort((a, b) => b[1] - a[1]);
   if (!rows.length) return '<p class="empty">기록이 없어요</p>';
   const max = rows[0][1];
@@ -534,7 +543,7 @@ function barsHtml(map, color, type) {
     const col = color || `var(--s${t === '저축' ? 2 : 3})`;
     return `<div class="bar-row" data-jump="${esc(t)}|${esc(c)}"><span class="name">${esc(c)}</span>
       <div class="bar-track"><div class="bar-fill" style="width:${v / max * 100}%;background:${col}"></div></div>
-      <span class="v num">${won(v)}</span>${chg(v, t + '|' + c)}</div>`;
+      <span class="v num">${won(v)}</span>${chg(v, t + '|' + c, base, label)}</div>`;
   }).join('');
 }
 
@@ -1079,3 +1088,15 @@ createStore().then(s => {
 });
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js');
+
+// 홈 화면에 추가한 앱은 완전히 닫지 않으면 예전 화면이 그대로 남는다.
+// 앱으로 다시 돌아올 때 서버의 app.js가 바뀌었으면(새 버전을 올렸으면) 새로고침한다. 입력 창이 열려 있으면 건드리지 않음.
+const versionTag = () => fetch('app.js', { method: 'HEAD', cache: 'no-store' })
+  .then(r => r.ok ? r.headers.get('etag') || r.headers.get('last-modified') : null).catch(() => null);
+let loadedTag = null;
+versionTag().then(t => { loadedTag = t; });
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState !== 'visible' || !loadedTag) return;
+  const t = await versionTag();
+  if (t && t !== loadedTag && !document.querySelector('dialog[open]')) location.reload();
+});
