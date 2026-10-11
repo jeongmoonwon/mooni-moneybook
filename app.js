@@ -804,6 +804,16 @@ function saveReviewCfg(patch) {
 }
 const rvMinValue = () => Number($('#s-rv-min').value.replace(/[^\d]/g, '')) || 0;
 function setRvMin(n) { $('#s-rv-min').value = n ? n.toLocaleString('ko-KR') : ''; }
+// 설정은 묶음 목록 → 세부 화면 두 단계. 세부 화면에선 위 ‹ 로 목록으로 돌아감
+const SET_PAGES = { book: '가계부', look: '화면', review: '소비 리뷰', data: '데이터 · 계정' };
+function setPage(k) {
+  $('#set-menu').hidden = !!k;
+  document.querySelectorAll('#settings .set-page').forEach(el => { el.hidden = el.dataset.page !== k; });
+  $('#set-title').textContent = k ? SET_PAGES[k] : '설정';
+  $('[data-setback]').hidden = !k;
+  $('#settings .body').scrollTop = 0;
+}
+
 // 설정 '확인': 입력 중인 값(이름, 리뷰 금액)을 반영하고 닫기
 function applySettings() {
   // 칸에 쓰고 '추가' 대신 '확인'을 눌러도 들어가게. 고치던 중이면 바꾼 게 있을 때만 반영하고, 그대로면 그냥 닫기
@@ -1604,6 +1614,7 @@ function openSettings() {
   renderReviewCats(); renderMoodSettings();
   $('#s-import-msg').textContent = '';
   loadFont(); renderPrefs();
+  setPage(''); // 늘 묶음 목록부터
   $('#settings').showModal(); document.activeElement.blur(); // 닫기(✕) 버튼에 포커스 테두리가 생기지 않게
 }
 
@@ -1732,6 +1743,8 @@ document.addEventListener('click', ev => {
   if (d.cedel) return deleteCat(d.cedel);
   if (d.rvadd !== undefined) { setRvMin(d.rvadd === '0' ? 0 : rvMinValue() + Number(d.rvadd)); return saveReviewCfg({ min: rvMinValue() }); }
   if (d.setok !== undefined) return applySettings();
+  if (d.setpage) return setPage(d.setpage);
+  if (d.setback !== undefined) return setPage('');
   if (d.pieetc) { state.pieEtc = !state.pieEtc; return renderMonth(); }
   if (d.lookfold) { state.lookOpen = { ...state.lookOpen, [d.lookfold]: !(state.lookOpen || {})[d.lookfold] }; return renderMonth(); }
   if (d.ffeel !== undefined) { state.formFeel = d.ffeel || 'none'; if (d.ffeel !== '후회') state.formMood = ''; return renderFormFeel(); }

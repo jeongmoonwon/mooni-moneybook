@@ -125,11 +125,14 @@
 
 <!-- 설정 -->
 <dialog id="settings"><div class="body">
-  <div class="sheet-head" style="margin-bottom:12px"><h2>설정</h2><button class="icon-btn" data-close aria-label="닫기">✕</button></div>
-  <div class="set-row">
-    <div><b>계정</b><p id="s-account"></p><p id="sync" aria-live="polite"></p></div>
-    <button class="chip" id="sign-out">로그아웃</button>
+  <div class="sheet-head" style="margin-bottom:12px"><button class="icon-btn set-back" data-setback aria-label="뒤로" hidden>‹</button><h2 id="set-title">설정</h2><button class="icon-btn" data-close aria-label="닫기">✕</button></div>
+  <div class="set-menu" id="set-menu">
+    <button class="set-item" data-setpage="book"><span class="si-ic">📒</span><span class="si-t"><b>가계부</b><small>이름 · 한 달 시작일 · 카테고리</small></span><span class="si-go">›</span></button>
+    <button class="set-item" data-setpage="look"><span class="si-ic">🎨</span><span class="si-t"><b>화면</b><small>화면 모드 · 글씨체</small></span><span class="si-go">›</span></button>
+    <button class="set-item" data-setpage="review"><span class="si-ic">💭</span><span class="si-t"><b>소비 리뷰</b><small>리뷰 금액 · 시점 · 카테고리 · 후회할 때 기분</small></span><span class="si-go">›</span></button>
+    <button class="set-item" data-setpage="data"><span class="si-ic">📂</span><span class="si-t"><b>데이터 · 계정</b><small>CSV 가져오기 · 로그인 계정</small></span><span class="si-go">›</span></button>
   </div>
+  <div class="set-page" data-page="book" hidden>
   <div class="set-row">
     <div><b>가계부 이름</b><p>맨 위 왼쪽에 보이는 제목이에요. 비우면 기본 이름으로 돌아가요</p></div>
     <input class="input" id="s-title" maxlength="20" autocomplete="off" placeholder="mooni의 가계부" style="width:150px">
@@ -138,6 +141,12 @@
     <div><b>'한 달'의 시작일</b><p>이 날부터 다음 달 이 날의 전날까지를 한 달로 봐요. 월급날로 맞추면 편해요</p></div>
     <select class="input" id="s-payday"></select>
   </div>
+  <div class="set-row">
+    <div><b>카테고리</b><p>추가 · 삭제 · 이름 바꾸기 · 순서 바꾸기</p></div>
+    <button class="chip" id="open-cats">편집</button>
+  </div>
+  </div>
+  <div class="set-page" data-page="look" hidden>
   <div class="set-row stack">
     <div><b>화면 모드</b><p>'기기 설정 따라'를 고르면 휴대폰이 다크 모드일 때 앱도 어두워져요</p></div>
     <div class="seg" id="s-theme" role="group" aria-label="화면 모드"></div>
@@ -146,10 +155,8 @@
     <div><b>글씨체</b><p>이 기기에만 적용돼요</p></div>
     <div class="font-list" id="s-font"></div>
   </div>
-  <div class="set-row">
-    <div><b>카테고리</b><p>추가 · 삭제 · 이름 바꾸기 · 순서 바꾸기</p></div>
-    <button class="chip" id="open-cats">편집</button>
   </div>
+  <div class="set-page" data-page="review" hidden>
   <div class="set-row stack">
     <div><b>소비 리뷰 금액</b><p>이 금액 이상인 지출만 나중에 만족도를 물어봐요</p></div>
     <input class="input amount num" id="s-rv-min" inputmode="numeric" placeholder="0" autocomplete="off" style="margin-top:8px">
@@ -178,11 +185,18 @@
       <button class="chip" data-moodadd style="white-space:nowrap">추가</button>
     </div>
   </div>
+  </div>
+  <div class="set-page" data-page="data" hidden>
   <div class="set-row">
     <div><b>CSV 가져오기</b><p>내보낸 CSV나 이전 내역 파일을 불러와요</p></div>
     <label class="chip" style="white-space:nowrap">파일 선택<input type="file" id="s-import" accept=".csv" hidden></label>
   </div>
   <p class="note" id="s-import-msg"></p>
+  <div class="set-row">
+    <div><b>계정</b><p id="s-account"></p><p id="sync" aria-live="polite"></p></div>
+    <button class="chip" id="sign-out">로그아웃</button>
+  </div>
+  </div>
   <div class="actions"><button class="btn primary" data-setok>확인</button></div>
 </div></dialog>
 
