@@ -554,7 +554,19 @@ function budgetHtml(exp) {
     : `<p class="bud-note good">예산보다 ${won(rest)} 덜 썼어요</p>`;
   else if (!budget) note = '<p class="bud-note">예산을 정하면 남은 돈과 하루에 쓸 수 있는 돈을 알려줘요</p>';
 
-  return `<div class="bud-top">${top}</div>
+  // 평소 이맘때(최근 12개월 같은 기간 평균)와 비교한 한 줄. 차이가 3% 안쪽이면 비슷하다고만
+  let cmp = '';
+  const pace = state.pace, avg = pace ? pace.avg('지출') : 0;
+  if (avg && spent) {
+    const diff = spent - avg, p = Math.round(diff / avg * 100), when = live ? '평소 이맘때' : '평소';
+    const tip = `최근 ${pace.n}개월 ${live ? `같은 기간(${now + 1}일째까지) ` : ''}평균 ${won(avg)}`;
+    cmp = Math.abs(p) < 3
+      ? `<p class="bud-cmp" title="${tip}">${when}와 비슷하게 ${live ? '쓰고 있어요' : '썼어요'}</p>`
+      : `<p class="bud-cmp ${diff > 0 ? 'up' : 'down'}" title="${tip}">${when}보다 <b>${compact(Math.abs(diff))}원 ${diff > 0 ? '더' : '덜'}</b> ${live ? '쓰고 있어요' : '썼어요'}
+          <span>${diff > 0 ? '▲' : '▼'}${Math.abs(p)}%</span></p>`;
+  }
+
+  return `<div class="bud-top">${top}</div>${cmp}
     <svg class="bud-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="날짜별 누적 지출">${g}</svg>
     <div class="bud-legend"><span><i class="k-cum"></i>쓴 돈(누적)</span>${budget ? '<span><i class="k-pace"></i>고르게 쓸 때</span><span><i class="k-bud"></i>예산</span>' : ''}</div>
     ${note}`;
