@@ -832,21 +832,24 @@ function catPieHtml(byCat) {
   const top = rows.slice(0, 5).filter(([, v]) => v / total >= 0.05), restRows = rows.slice(top.length);
   const rest = restRows.reduce((s, [, v]) => s + v, 0);
   const parts = top.map(([c, v], i) => ({ c, v, color: `var(--c${i + 1})` }));
-  if (rest) parts.push({ c: '기타', v: rest, color: 'var(--c-other)', etc: restRows.map(([c]) => c).join(', ') });
+  // 작은 카테고리는 '그 외'로 묶음 (지출 카테고리 '기타'와 헷갈리지 않게 다른 이름). 누르면 옆에 안에 든 카테고리가 펼쳐짐
+  if (rest) parts.push({ c: '그 외', v: rest, color: 'var(--c-other)', etc: restRows.map(([c]) => c).join(', ') });
   const CX = 170, CY = 118, R = 74, W = 30, C = 2 * Math.PI * R, GAP = parts.length > 1 ? 2 : 0;
   let off = 0, labels = '';
   const arcs = parts.map(p => {
     const len = p.v / total * C, dash = Math.max(len - GAP, 0.5), pct = Math.round(p.v / total * 100);
     const mid = (off + len / 2) / C * 2 * Math.PI - Math.PI / 2, lr = R + W / 2 + 10; // 조각 가운데 각도, 12시에서 시계방향
     const x = CX + Math.cos(mid) * lr, y = CY + Math.sin(mid) * lr, anchor = Math.abs(Math.cos(mid)) < 0.25 ? 'middle' : Math.cos(mid) > 0 ? 'start' : 'end';
-    const jump = p.etc ? '' : ` data-jump="지출|${esc(p.c)}"`;
-    labels += `<g class="pl"${jump}><text x="${x}" y="${y - 1}" text-anchor="${anchor}" class="pl-n">${esc(p.c)}</text>
+    const jump = p.etc ? ' data-pieetc="1"' : ` data-jump="지출|${esc(p.c)}"`;
+    labels += `<g class="pl"${jump}><text x="${x}" y="${y - 1}" text-anchor="${anchor}" class="pl-n">${esc(p.c)}${p.etc ? (state.pieEtc ? ' ▸' : ' ▾') : ''}</text>
       <text x="${x}" y="${y + 12}" text-anchor="${anchor}" class="pl-v">${pct}% · ${compact(p.v)}</text></g>`;
     const arc = `<circle r="${R}" cx="${CX}" cy="${CY}" fill="none" stroke="${p.color}" stroke-width="${W}" stroke-dasharray="${dash} ${C - dash}" stroke-dashoffset="${-off}" transform="rotate(-90 ${CX} ${CY})"${jump}>
       <title>${esc(p.c)} ${won(p.v)} (${pct}%)${p.etc ? ' · ' + esc(p.etc) : ''}</title></circle>`;
     off += len; return arc;
   }).join('');
-  return `<div class="pie"><svg viewBox="0 0 340 236" role="img" aria-label="카테고리별 지출 비율">${arcs}${labels}${paceText(total, CX, CY)}</svg></div>`;
+  const open = rest && state.pieEtc;
+  const etc = open ? `<div class="pie-etc"><p>그 외 ${restRows.length}개</p>${restRows.map(([c, v]) => `<button data-jump="지출|${esc(c)}"><span>${esc(c)}</span><b class="num">${compact(v)}</b><small>${Math.round(v / total * 100)}%</small></button>`).join('')}</div>` : '';
+  return `<div class="pie${open ? ' open' : ''}"><svg viewBox="0 0 340 236" role="img" aria-label="카테고리별 지출 비율">${arcs}${labels}${paceText(total, CX, CY)}</svg>${etc}</div>`;
 }
 
 // 원그래프 가운데: 쓴 돈 + 평소 이맘때(최근 12개월 같은 기간 평균) 대비 %
@@ -1464,7 +1467,7 @@ $('#trend-chart').addEventListener('click', ev => {
   renderTrend();
 });
 document.addEventListener('click', ev => {
-  const b = ev.target.closest('button, .item, .bar-row, .cb-head, .pie [data-jump]'); if (!b) return;
+  const b = ev.target.closest('button, .item, .bar-row, .cb-head, .pie [data-jump], .pie [data-pieetc]'); if (!b) return;
   const d = b.dataset;
   if (d.view) { if (b.closest('dialog')) b.closest('dialog').close(); return go(d.view); }
   if (d.type) { state.type = d.type; state.category = cats(d.type)[0]; return renderForm(); }
@@ -1527,6 +1530,7 @@ document.addEventListener('click', ev => {
   if (d.cedel) return deleteCat(d.cedel);
   if (d.rvadd !== undefined) { setRvMin(d.rvadd === '0' ? 0 : rvMinValue() + Number(d.rvadd)); return saveReviewCfg({ min: rvMinValue() }); }
   if (d.setok !== undefined) return applySettings();
+  if (d.pieetc) { state.pieEtc = !state.pieEtc; return renderMonth(); }
   if (d.lookfold) { state.lookOpen = { ...state.lookOpen, [d.lookfold]: !(state.lookOpen || {})[d.lookfold] }; return renderMonth(); }
   if (d.pref) { const [k, v] = d.pref.split('|'); return setPref(k, v); }
   if (d.cemove) { const [i, dir] = d.cemove.split('|').map(Number); return moveCat(i, dir); }

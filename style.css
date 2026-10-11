@@ -558,3 +558,13 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 .lb-mood{margin:12px 0 0;font-size:14px;background:var(--wash);border-radius:14px;padding:9px 12px}
 .lb-fold{display:flex;justify-content:space-between;align-items:center;width:100%;margin-top:10px;padding:11px 12px;border:0;border-radius:14px;background:var(--page);font-size:14px;font-weight:700;color:var(--t1)}
 .lb-fold i{font-style:normal;font-size:12px;color:var(--t-strong);font-weight:400}
+
+/* 원그래프 '그 외' 펼치기: 그래프 옆에 안에 든 카테고리 */
+.pie [data-pieetc]{cursor:pointer}
+.pie.open{display:grid;grid-template-columns:1.55fr 1fr;align-items:center;gap:6px}
+.pie-etc{background:var(--page);border-radius:14px;padding:8px}
+.pie-etc p{margin:0 0 4px;font-size:11px;color:var(--mu);font-weight:700}
+.pie-etc button{display:grid;grid-template-columns:1fr auto;width:100%;border:0;background:none;padding:5px 2px;text-align:left;color:var(--t1);border-top:1px solid var(--grid);font-size:12px}
+.pie-etc button:first-of-type{border-top:0}
+.pie-etc span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pie-etc small{grid-column:1/-1;font-size:10px;color:var(--mu)}
