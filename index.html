@@ -300,17 +300,27 @@
 <!-- 나만의 배지 만들기 -->
 <dialog id="badge-maker" class="sheet"><div class="body">
   <div class="sheet-head"><h2>나만의 배지 만들기</h2><button class="icon-btn" data-close aria-label="닫기">✕</button></div>
-  <p class="note" style="margin:0">한 달 안에 이루는 도전이에요. 고르기만 하면 돼요</p>
+  <p class="note" style="margin:0">한 달 안에 이루는 도전이에요</p>
   <div class="field"><p class="label">무엇을</p><div class="chips" id="bm-kind"></div></div>
+  <div class="field"><p class="label" id="bm-title-l">이름 (선택)</p><input class="input" id="bm-title" maxlength="20" autocomplete="off"></div>
+  <div class="field" id="bm-custom-f" hidden><p class="label">아이콘</p><div class="chips" id="bm-icon"></div>
+    <p class="note" style="margin-top:6px">직접 적은 배지는 앱이 셀 수 없어서, 홈에서 배지를 눌러 한 번씩 체크해요</p></div>
   <div class="field" id="bm-cat-f"><p class="label">어떤 걸 (선택)</p><div class="chips" id="bm-cat"></div></div>
   <div class="field" id="bm-n-f"><p class="label">얼마나</p>
     <div class="chips" id="bm-unit" style="margin-bottom:8px"></div>
-    <div class="bm-stepper"><button class="step" data-bmstep="-1" aria-label="줄이기">−</button><b id="bm-n" class="num"></b><button class="step" data-bmstep="1" aria-label="늘리기">＋</button></div>
+    <div class="bm-num"><input class="input amount num" id="bm-n-in" inputmode="numeric" autocomplete="off"><span id="bm-n-unit">번</span></div>
     <div class="bm-lv" id="bm-lv"></div>
-    <p class="note" style="margin-top:6px">쉬움 · 보통 · 도전은 지난달 내 기록으로 계산해요</p></div>
+    <p class="note" id="bm-lv-note" style="margin-top:6px">쉬움 · 보통 · 도전은 지난달 내 기록으로 계산해요</p></div>
+  <div class="field"><p class="label">색깔</p><div class="bm-colors" id="bm-color"></div></div>
   <div class="bm-prev" id="bm-prev"></div>
-  <div class="field"><p class="label">이름 (선택)</p><input class="input" id="bm-title" maxlength="20" autocomplete="off"></div>
   <div class="actions"><button class="btn primary" data-bmsave>저장</button></div>
+</div></dialog>
+
+<!-- 직접 적은 배지 체크 -->
+<dialog id="badge-check"><div class="body">
+  <div class="bc" id="bc-body"></div>
+  <div class="actions"><button class="btn ghost" data-bcstep="-1">− 하나 빼기</button><button class="btn primary" data-bcstep="1">＋ 했어요!</button></div>
+  <div class="actions" style="margin-top:8px"><button class="btn ghost" data-close>닫기</button></div>
 </div></dialog>
 
 <!-- 지금까지 받은 배지 -->

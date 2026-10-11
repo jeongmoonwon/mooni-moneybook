@@ -297,7 +297,11 @@ const BADGE_KINDS = {
   regret: { icon: '🌱', color: '#B8E0A0', label: '후회 줄이기', units: ['count'] },
   daily: { icon: '🔥', color: '#FFB566', label: '꾸준히 기록', units: ['days'] },
   budget: { icon: '🎯', color: '#F7A3BE', label: '예산 지키기', units: [] },
+  custom: { icon: '✏️', color: '#C8B6FF', label: '직접 적기', units: ['count'] }, // 기록으로 못 세니 홈에서 눌러 직접 체크
 };
+const BADGE_COLORS = ['#FFB59A', '#FFDB6E', '#8ED9B4', '#9CC8FF', '#C8B6FF', '#F7A3BE', '#FFB566', '#B8E0A0', '#BFD7EA', '#E2C2A3'];
+const CUSTOM_ICONS = ['✏️', '🏃', '💪', '📚', '🧘', '🥗', '🚶', '💤', '🎨', '🍳', '💧', '🚭'];
+const badgeColor = b => b.color || BADGE_KINDS[b.kind].color;
 const CAT_ICON = { '식비': '🍚', '간식': '🍰', '카공': '☕', '생필품': '🧴', '취미/문화생활': '🎬', '자기개발': '📚', '의료/건강': '💊',
   '의류': '👕', '미용': '💇', '여행': '✈️', '경조사/선물': '🎁', '가전': '📺', '교통비': '🚌', '통신비': '📱', '월세': '🏠', '배달': '🛵' };
 const BASIC_BADGES = () => [
@@ -308,9 +312,9 @@ function badgeName(b) {
   if (b.title) return b.title;
   const c = b.cat ? b.cat + ' ' : '';
   return { held: `${c}${nfmt(b.n, b.unit)} 참기`, reduce: `${c || '지출 '}${nfmt(b.n, b.unit)} 이하`, sat: `만족 ${b.n}% 넘기기`,
-    regret: `후회 ${b.n}번 이하`, daily: `${b.n}일 기록하기`, budget: '예산 안에서 쓰기' }[b.kind];
+    regret: `후회 ${b.n}번 이하`, custom: `나만의 목표 ${b.n}번`, daily: `${b.n}일 기록하기`, budget: '예산 안에서 쓰기' }[b.kind];
 }
-const badgeIcon = b => (b.cat && CAT_ICON[b.cat]) || BADGE_KINDS[b.kind].icon;
+const badgeIcon = b => b.icon || (b.cat && CAT_ICON[b.cat]) || BADGE_KINDS[b.kind].icon;
 const badgesOf = key => ((state.settings.badges || {})[key] || []).filter(b => BADGE_KINDS[b.kind]); // 없어진 종류(예전 '리뷰 다 하기')는 건너뜀
 
 // 진행도: fill(0~1) · label · done(받음) · fail(이번 달은 못 받음)
@@ -324,6 +328,10 @@ function badgeProgress(b, key) {
   // '이하' 배지: 한 달을 넘지 않고 버티는 동안 날짜만큼 차오르고, 넘으면 비워진다
   const keepUnder = (used, n, unit) => used > n ? { fill: 0, label: '넘었어요', fail: true }
     : past ? { fill: 1, label: '받았어요', done: true } : { fill: elapsed, label: `${nfmt(n - used, unit)} 남음` };
+  if (b.kind === 'custom') {
+    const v = b.count || 0;
+    return v >= b.n ? { fill: 1, label: '받았어요', done: true } : { fill: v / b.n, label: `${v} / ${b.n}번 · 눌러서 체크`, fail: past };
+  }
   if (b.kind === 'held') {
     const v = val(state.held.filter(h => periodOf(h) === key && (!b.cat || h.category === b.cat)), b.unit);
     return v >= b.n ? { fill: 1, label: '받았어요', done: true } : { fill: v / b.n, label: `${nfmt(v, b.unit)} / ${nfmt(b.n, b.unit)}`, fail: past };
@@ -357,7 +365,7 @@ function ensureMonthBadges() {
   state.badgeInit = key;
   const prevKey = Object.keys(all).filter(k => k < key).sort().at(-1);
   const carry = prevKey ? badgesOf(prevKey).filter(b => b.origin !== 'basic' && !badgeProgress(b, prevKey).done)
-    .map(b => ({ ...b, id: newId(), origin: 'carry', from: prevKey })) : [];
+    .map(b => ({ ...b, count: 0, id: newId(), origin: 'carry', from: prevKey })) : [];
   saveBadges(key, [...BASIC_BADGES(), ...carry]);
 }
 function saveBadges(key, list) {
@@ -371,7 +379,7 @@ function earnedBadges() {
 }
 
 function badgeHtml(b, p, small) {
-  return `<span class="bd ${p.done ? 'full' : p.fill > 0 ? 'mid' : 'todo'}${small ? ' sm' : ''}" style="--c:${BADGE_KINDS[b.kind].color};--p:${Math.round(p.fill * 100)}%"><span>${badgeIcon(b)}</span></span>`;
+  return `<span class="bd ${p.done ? 'full' : p.fill > 0 ? 'mid' : 'todo'}${small ? ' sm' : ''}" style="--c:${badgeColor(b)};--p:${Math.round(p.fill * 100)}%"><span>${badgeIcon(b)}</span></span>`;
 }
 function renderHomeBadges() {
   const key = periodOfDate(today()), list = badgesOf(key), m = Number(key.slice(5));
@@ -379,7 +387,7 @@ function renderHomeBadges() {
   $('#home-badges').innerHTML = `<div class="card">
     <div class="card-head" style="margin:0"><div><h2 style="margin:0">${m}월 배지</h2><p class="label" style="margin:2px 0 0">도전 중 ${list.length - got}개 · 받은 배지 ${got}개</p></div>
       <button class="chip sm bud-edit" data-badgeedit>✎ 목록 편집하기</button></div>
-    ${list.length ? `<div class="bgrid">${list.map((b, i) => `<div>${badgeHtml(b, ps[i])}<small>${esc(badgeName(b))}</small><em>${esc(ps[i].label)}</em></div>`).join('')}</div>`
+    ${list.length ? `<div class="bgrid">${list.map((b, i) => `<div${b.kind === 'custom' ? ` class="bcheck" data-bcheck="${i}"` : ''}>${badgeHtml(b, ps[i])}<small>${esc(badgeName(b))}</small><em>${esc(ps[i].label)}</em></div>`).join('')}</div>`
       : '<p class="empty">목록 편집하기에서 배지를 추가해 보세요</p>'}
     <button class="link-btn" data-badgeall style="margin-top:12px">지금까지 받은 배지 · ${earnedBadges().length}개 ›</button></div>`;
 }
@@ -458,27 +466,54 @@ function renderBadgeMaker() {
   $('#bm-kind').innerHTML = Object.entries(BADGE_KINDS).map(([k, v]) => `<button class="chip" data-bmkind="${k}" aria-pressed="${m.kind === k}">${v.icon} ${v.label}</button>`).join('');
   $('#bm-cat-f').hidden = !K.cat;
   $('#bm-cat').innerHTML = ['', ...cats('지출')].map(c => `<button class="chip sm" data-bmcat="${esc(c)}" aria-pressed="${m.cat === c}">${c ? esc(c) : '전체'}</button>`).join('');
+  const custom = m.kind === 'custom';
+  $('#bm-custom-f').hidden = !custom;
+  if (custom) $('#bm-icon').innerHTML = CUSTOM_ICONS.map(ic => `<button class="chip" data-bmicon="${ic}" aria-pressed="${(m.icon || '✏️') === ic}">${ic}</button>`).join('');
   $('#bm-n-f').hidden = !K.units.length;
   if (K.units.length) {
     $('#bm-unit').innerHTML = K.units.length > 1 ? K.units.map(u => `<button class="chip sm" data-bmunit="${u}" aria-pressed="${m.unit === u}">${u === 'amount' ? '금액으로' : '횟수로'}</button>`).join('') : '';
-    $('#bm-n').textContent = nfmt(m.n, m.unit);
+    if (document.activeElement !== $('#bm-n-in')) $('#bm-n-in').value = m.unit === 'amount' ? m.n.toLocaleString('ko-KR') : m.n;
+    $('#bm-n-unit').textContent = { amount: '원', pct: '%', days: '일', count: '번' }[m.unit];
     $('#bm-lv').innerHTML = lv ? ['쉬움', '보통', '도전'].map((t, i) => `<button data-bmlv="${lv[i]}" aria-pressed="${m.n === lv[i]}"><b>${t}</b>${nfmt(lv[i], m.unit)}</button>`).join('') : '';
+    $('#bm-lv-note').hidden = !lv;
   }
-  $('#bm-title').placeholder = badgeName({ ...m, title: '' });
-  $('#bm-title').value = m.title || '';
+  $('#bm-color').innerHTML = BADGE_COLORS.map(c => `<button class="bm-sw" data-bmcolor="${c}" style="background:${c}" aria-pressed="${badgeColor(m) === c}" aria-label="색 ${c}"></button>`).join('');
+  $('#bm-title-l').textContent = custom ? '무엇을 할까요?' : '이름 (선택)';
+  $('#bm-title').placeholder = custom ? '예: 아침 운동하기, 도시락 싸기' : badgeName({ ...m, title: '' });
+  if (document.activeElement !== $('#bm-title')) $('#bm-title').value = m.title || '';
   $('#bm-prev').innerHTML = `${badgeHtml(m, { fill: 1, done: true })}<span><b>${esc(badgeName(m))}</b><small>이번 달 안에 이루면 받아요</small></span>`;
 }
-function makerStep(dir) {
-  const m = state.maker, s = m.unit === 'amount' ? 10000 : m.unit === 'pct' ? 5 : 1;
-  m.n = Math.max(0, m.n + dir * s); if (m.unit === 'pct') m.n = Math.min(100, m.n);
+function makerNumInput(el) { // 숫자 직접 입력 (금액이면 콤마)
+  const m = state.maker; let n = Number(el.value.replace(/[^\d]/g, '')) || 0;
+  if (m.unit === 'pct') n = Math.min(100, n);
+  m.n = n; if (m.unit === 'amount') el.value = n ? n.toLocaleString('ko-KR') : '';
   renderBadgeMaker();
 }
 function saveBadgeMaker() {
   const m = state.maker, { idx, ...b } = m;
   b.title = $('#bm-title').value.trim();
+  if (b.kind === 'custom' && !b.title) { toast('무엇을 할지 적어 주세요'); return $('#bm-title').focus(); }
+  if (b.kind !== 'custom') delete b.icon;
+  if (BADGE_KINDS[b.kind].units.length && !b.n && b.kind !== 'reduce' && b.kind !== 'regret') { toast('목표 숫자를 넣어 주세요'); return $('#bm-n-in').focus(); }
   if (idx != null) state.badgeDraft[idx] = { ...state.badgeDraft[idx], ...b };
   else state.badgeDraft.push({ ...b, id: newId(), origin: 'mine' });
   $('#badge-maker').close(); renderBadgeEditor();
+}
+
+// '직접 적기' 배지: 홈에서 누르면 한 번씩 직접 체크 (이번 달 목록에 횟수를 저장)
+function openBadgeCheck(i) {
+  state.bcheck = i; renderBadgeCheck(); $('#badge-check').showModal(); document.activeElement.blur();
+}
+function renderBadgeCheck() {
+  const key = periodOfDate(today()), b = badgesOf(key)[state.bcheck]; if (!b) return;
+  $('#bc-body').innerHTML = `${badgeHtml(b, badgeProgress(b, key))}<h3>${esc(badgeName(b))}</h3>
+    <p class="num">${b.count || 0} / ${b.n}번</p>`;
+}
+function badgeCheckStep(dir) {
+  const key = periodOfDate(today()), list = badgesOf(key).map(x => ({ ...x })), b = list[state.bcheck]; if (!b) return;
+  b.count = Math.max(0, (b.count || 0) + dir);
+  saveBadges(key, list); renderBadgeCheck(); renderHome();
+  if (dir > 0) toast(b.count >= b.n ? `🎉 '${badgeName(b)}' 배지를 받았어요!` : '체크했어요 👍');
 }
 
 function openEarned() {
@@ -1551,7 +1586,7 @@ $('#trend-chart').addEventListener('click', ev => {
   renderTrend();
 });
 document.addEventListener('click', ev => {
-  const b = ev.target.closest('button, .item, .bar-row, .cb-head, .pie [data-jump], .pie [data-pieetc]'); if (!b) return;
+  const b = ev.target.closest('button, .item, .bar-row, .cb-head, .pie [data-jump], .pie [data-pieetc], [data-bcheck]'); if (!b) return;
   const d = b.dataset;
   if (d.view) { if (b.closest('dialog')) b.closest('dialog').close(); return go(d.view); }
   if (d.type) { state.type = d.type; state.category = cats(d.type)[0]; return renderForm(); }
@@ -1582,7 +1617,10 @@ document.addEventListener('click', ev => {
   if (d.bmcat !== undefined) { state.maker.cat = d.bmcat; const lv = makerLevels(state.maker); if (lv) state.maker.n = lv[1]; return renderBadgeMaker(); }
   if (d.bmunit) { state.maker.unit = d.bmunit; const lv = makerLevels(state.maker); if (lv) state.maker.n = lv[1]; return renderBadgeMaker(); }
   if (d.bmlv) { state.maker.n = Number(d.bmlv); return renderBadgeMaker(); }
-  if (d.bmstep) return makerStep(Number(d.bmstep));
+  if (d.bmcolor) { state.maker.color = d.bmcolor; return renderBadgeMaker(); }
+  if (d.bmicon) { state.maker.icon = d.bmicon; return renderBadgeMaker(); }
+  if (d.bcheck !== undefined) return openBadgeCheck(Number(d.bcheck));
+  if (d.bcstep) return badgeCheckStep(Number(d.bcstep));
   if (d.bmsave !== undefined) return saveBadgeMaker();
   if (d.goalok !== undefined) return saveGoal();
   if (d.review !== undefined) return openReview();
@@ -1649,6 +1687,8 @@ $('#s-rv-min').addEventListener('change', () => saveReviewCfg({ min: rvMinValue(
 $('#s-rv-min').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
 $('#s-rv-days').addEventListener('change', e => saveReviewCfg({ days: Number(e.target.value) }));
 $('#g-text').addEventListener('keydown', e => { if (e.key === 'Enter') saveGoal(); });
+$('#bm-n-in').addEventListener('input', e => makerNumInput(e.target));
+$('#bm-title').addEventListener('input', e => { state.maker.title = e.target.value; $('#bm-prev').innerHTML = `${badgeHtml(state.maker, { fill: 1, done: true })}<span><b>${esc(badgeName({ ...state.maker, title: e.target.value.trim() }))}</b><small>이번 달 안에 이루면 받아요</small></span>`; });
 $('#s-mood-new').addEventListener('keydown', e => { if (e.key === 'Enter') addMood(); });
 $('#f-amount').addEventListener('input', () => setAmount(amountValue()));
 $('#budget-editor').addEventListener('pointerdown', budDragStart);

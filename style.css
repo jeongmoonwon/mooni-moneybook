@@ -587,3 +587,17 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 .mood-item[aria-pressed=true]{border-color:var(--ink);background:var(--wash)}
 
 #form-actions .btn{white-space:nowrap}
+
+/* 배지 만들기: 숫자 직접 입력, 색깔, 직접 체크 */
+.bm-num{display:flex;align-items:center;gap:8px}
+.bm-num input{flex:1}
+.bm-num span{font-size:16px;font-weight:700;color:var(--t2)}
+.bm-colors{display:flex;flex-wrap:wrap;gap:10px}
+.bm-sw{width:32px;height:32px;border-radius:50%;border:3px solid var(--card);box-shadow:0 0 0 1.5px var(--border);padding:0}
+.bm-sw[aria-pressed=true]{box-shadow:0 0 0 2.5px var(--ink)}
+.bgrid .bcheck{cursor:pointer}
+.bc{text-align:center}
+.bc .bd{width:84px;height:84px}
+.bc .bd > span{font-size:38px}
+.bc h3{margin:10px 0 2px;font-size:18px}
+.bc p{margin:0;color:var(--mu)}
