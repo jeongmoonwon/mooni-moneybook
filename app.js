@@ -78,7 +78,7 @@ const state = {
   user: null, entries: [], held: [], settings: { payday: 25 }, pending: false,
   view: 'home', type: '지출', category: '식비', date: today(), editing: null, heldEditing: null, rv: [], rvI: 0,
   period: null, calDay: today(), trendType: '지출', trendCat: '', fltType: '', fltCat: '', q: '', visible: [],
-  info: false, ceType: '지출', ceDelete: null,
+  info: false, ceType: '지출', ceDelete: null, calc: '', split: null,
 };
 function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
@@ -138,11 +138,61 @@ function heldItemHtml(h) {
     <div class="amt num saved">${h.amount ? won(h.amount) + ' 아낌' : ''}</div></li>`;
 }
 
+/* ================= 계산기 · N빵 ================= */
+// 금액 칸 아래에 여는 작은 계산기. eval 없이 + − × ÷ 만 직접 계산 (곱셈·나눗셈 먼저)
+const CALC_OPS = '+−×÷';
+function calcValue(expr) {
+  const t = expr.match(/\d+|[+−×÷]/g) || [];
+  while (t.length && CALC_OPS.includes(t.at(-1))) t.pop(); // 끝에 연산자만 있으면 무시
+  if (!t.length) return 0;
+  let sum = 0, sign = 1, term = Number(t[0]);
+  for (let i = 1; i < t.length; i += 2) {
+    const op = t[i], v = Number(t[i + 1]);
+    if (op === '×') term *= v;
+    else if (op === '÷') term = v ? term / v : NaN;
+    else { sum += sign * term; sign = op === '+' ? 1 : -1; term = v; }
+  }
+  return sum + sign * term;
+}
+function renderCalc() {
+  const e = state.calc, v = calcValue(e);
+  $('#calc-expr').textContent = e ? e.replace(/\d+/g, n => Number(n).toLocaleString('ko-KR')) : '0';
+  $('#calc-res').textContent = /[+−×÷]\d/.test(e) ? (Number.isFinite(v) ? '= ' + won(Math.round(v)) : '0으로 나눌 수 없어요') : '';
+}
+function toggleCalc(open = $('#calc').hidden) {
+  $('#calc').hidden = !open;
+  $('[data-calctoggle]').setAttribute('aria-expanded', open);
+  if (open) { state.calc = amountValue() ? String(amountValue()) : ''; renderCalc(); }
+}
+function calcKey(k) {
+  let e = state.calc;
+  if (k === 'C') e = '';
+  else if (k === '⌫') e = e.slice(0, -1);
+  else if (CALC_OPS.includes(k)) { if (e) e = (CALC_OPS.includes(e.at(-1)) ? e.slice(0, -1) : e) + k; }
+  else e = /(^|[+−×÷])0$/.test(e) ? e.slice(0, -1) + k : e + k; // 맨 앞 0 뒤에 숫자 붙이지 않기
+  state.calc = e.slice(0, 40); renderCalc();
+}
+// N빵: 지금 계산 결과(없으면 입력된 금액)를 n명으로 나눔
+function calcSplit(n) {
+  const total = Math.round(calcValue(state.calc)) || amountValue();
+  if (!total) { toast('먼저 전체 금액을 입력해 주세요'); return; }
+  state.calc = `${total}÷${n}`; state.split = { total, n }; renderCalc();
+}
+function calcApply() {
+  const v = Math.round(calcValue(state.calc));
+  if (!Number.isFinite(v) || v <= 0) { toast('계산 결과가 0원보다 커야 해요'); return; }
+  setAmount(v);
+  const sp = state.split; // N빵이었으면 메모가 비어 있을 때 계산 내역을 남김
+  if (sp && state.calc === `${sp.total}÷${sp.n}` && !$('#f-memo').value.trim()) $('#f-memo').value = `총 ${won(sp.total)} ${sp.n}명 N빵`;
+  state.split = null; toggleCalc(false);
+}
+
 function amountValue() { return Number($('#f-amount').value.replace(/[^\d]/g, '')) || 0; }
 function setAmount(n) { $('#f-amount').value = n ? n.toLocaleString('ko-KR') : ''; }
 
 function resetForm() {
   state.editing = null;
+  toggleCalc(false);
   $('#f-detail').value = ''; setAmount(0); $('#f-memo').value = '';
   renderForm();
 }
@@ -977,6 +1027,10 @@ document.addEventListener('click', ev => {
   if (d.type) { state.type = d.type; state.category = cats(d.type)[0]; return renderForm(); }
   if (d.cat) { state.category = d.cat; return renderForm(); }
   if (d.detail) { $('#f-detail').value = d.detail; return $('#f-amount').focus(); }
+  if (d.calctoggle !== undefined) return toggleCalc();
+  if (d.ck) return calcKey(d.ck);
+  if (d.split) return calcSplit(Number(d.split));
+  if (d.calcok !== undefined) return calcApply();
   if (d.add !== undefined) { setAmount(d.add === '0' ? 0 : amountValue() + Number(d.add)); return; }
   if (d.shift) { state.date = addDays($('#f-date').value || today(), Number(d.shift)); return renderForm(); }
   if (d.pickmonth !== undefined) return openMonthPicker();

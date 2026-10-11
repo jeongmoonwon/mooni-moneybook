@@ -203,8 +203,21 @@
       </div>
 
       <div class="field">
-        <p class="label">금액</p>
+        <div class="label-row"><p class="label">금액</p><button class="chip sm calc-btn" data-calctoggle aria-expanded="false">🧮 계산기 · N빵</button></div>
         <input class="input amount num" id="f-amount" inputmode="numeric" placeholder="0" autocomplete="off">
+        <div class="calc" id="calc" hidden>
+          <div class="calc-screen"><span class="calc-expr num" id="calc-expr">0</span><b class="calc-res num" id="calc-res"></b></div>
+          <div class="calc-split"><span>N빵</span>
+            <button data-split="2">2명</button><button data-split="3">3명</button><button data-split="4">4명</button><button data-split="5">5명</button><button data-split="6">6명</button>
+          </div>
+          <div class="calc-keys">
+            <button data-ck="C" class="k-fn">C</button><button data-ck="⌫" class="k-fn">⌫</button><button data-ck="÷" class="k-op">÷</button><button data-ck="×" class="k-op">×</button>
+            <button data-ck="7">7</button><button data-ck="8">8</button><button data-ck="9">9</button><button data-ck="−" class="k-op">−</button>
+            <button data-ck="4">4</button><button data-ck="5">5</button><button data-ck="6">6</button><button data-ck="+" class="k-op">+</button>
+            <button data-ck="1">1</button><button data-ck="2">2</button><button data-ck="3">3</button><button data-calcok class="k-ok">입력</button>
+            <button data-ck="00">00</button><button data-ck="0">0</button><button data-ck="000">000</button>
+          </div>
+        </div>
         <div class="quick">
           <button class="chip sm" data-add="1000">+1천</button>
           <button class="chip sm" data-add="5000">+5천</button>
