@@ -1011,9 +1011,16 @@ function catSpendSection(map, byCat) {
   const rows = cats('지출').map(c => ({ c, b: map[c] || 0, s: byCat.get(c) || 0 })).filter(r => r.b || r.s)
     .map(r => ({ ...r, r: r.b ? r.s / r.b : Infinity })).sort((x, y) => y.r - x.r || y.s - x.s);
   return `<button class="cb-toggle" data-budopen aria-expanded="true"><span>지출 카테고리별로 보기</span><i>접기 ▴</i></button>
-    <div class="cs-list">${rows.map(({ c, b, s }) => `<button class="cs-row" data-jump="지출|${esc(c)}">
-      <span class="cs-head"><span>${esc(c)}</span><span class="num">${b ? `${compact(s)} / <b>${compact(b)}</b>` : `<b class="over">예산 없이 ${compact(s)}</b>`}</span></span>
-      <span class="tb-track"><i style="width:${b ? Math.min(100, s / b * 100) : 100}%" class="${!b || s > b ? 'over' : ''}"></i></span></button>`).join('')}</div>`;
+    <div class="cs-list">${rows.map(({ c, b, s }) => {
+      // 예산 대비 %. 넘었으면 막대 끝 = 지금 쓴 돈, 예산까지는 보통 색 + 넘은 부분은 진한 빨강
+      const p = b ? Math.round(s / b * 100) : null, over = b && s > b;
+      const bar = !b ? '<i class="ovr" style="left:0;width:100%"></i>'
+        : over ? `<i style="width:${b / s * 100}%"></i><i class="ovr" style="left:${b / s * 100}%;width:${(s - b) / s * 100}%"></i><u style="left:${b / s * 100}%"></u>`
+        : `<i style="width:${s / b * 100}%"></i>`;
+      return `<button class="cs-row" data-jump="지출|${esc(c)}">
+      <span class="cs-head"><span>${esc(c)}</span><span class="num">${b ? `${compact(s)} / <b>${compact(b)}</b> · <b class="${over ? 'over' : ''}">${p}%</b>` : `<b class="over">예산 없이 ${compact(s)}</b>`}</span></span>
+      <span class="cs-track">${bar}</span>${over ? `<span class="cs-over">예산보다 ${compact(s - b)}원 더 썼어요</span>` : ''}</button>`;
+    }).join('')}</div>`;
 }
 // 카테고리별 지출 비율 원그래프: 큰 순서로 5개(5% 이상)만 따로, 나머지는 '기타'. 조각 사이 2px 틈.
 // 범례 대신 각 조각 바깥쪽에 이름·비율을 글자로 붙인다 (색 위에 글자를 얹으면 밝은 색에서 안 읽혀서)
