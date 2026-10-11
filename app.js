@@ -535,39 +535,40 @@ function catBudgetsSection(map, byCat) {
       <p class="cb-hint">● 손잡이를 좌우로 끌어서 예산을 정해요 · 막대 끝은 카테고리마다 달라요</p>` : ''}`;
 }
 
-// 카테고리별 지출 비율 원그래프: 큰 순서로 5개 + 나머지는 '기타'. 조각 사이 2px 틈, 범례에 이름·금액·비율을 글자로
+// 카테고리별 지출 비율 원그래프: 큰 순서로 5개(5% 이상)만 따로, 나머지는 '기타'. 조각 사이 2px 틈.
+// 범례 대신 각 조각 바깥쪽에 이름·비율을 글자로 붙인다 (색 위에 글자를 얹으면 밝은 색에서 안 읽혀서)
 function catPieHtml(byCat) {
   const rows = [...byCat].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   const total = rows.reduce((s, [, v]) => s + v, 0);
   if (!total) return '';
-  const top = rows.slice(0, 5), rest = rows.slice(5).reduce((s, [, v]) => s + v, 0);
+  const top = rows.slice(0, 5).filter(([, v]) => v / total >= 0.05), restRows = rows.slice(top.length);
+  const rest = restRows.reduce((s, [, v]) => s + v, 0);
   const parts = top.map(([c, v], i) => ({ c, v, color: `var(--c${i + 1})` }));
-  if (rest) parts.push({ c: '기타', v: rest, color: 'var(--c-other)', etc: rows.slice(5).map(([c]) => c).join(', ') });
-  const R = 54, W = 16, C = 2 * Math.PI * R, GAP = parts.length > 1 ? 2 : 0;
-  let off = 0;
+  if (rest) parts.push({ c: '기타', v: rest, color: 'var(--c-other)', etc: restRows.map(([c]) => c).join(', ') });
+  const CX = 170, CY = 118, R = 74, W = 30, C = 2 * Math.PI * R, GAP = parts.length > 1 ? 2 : 0;
+  let off = 0, labels = '';
   const arcs = parts.map(p => {
-    const len = p.v / total * C, dash = Math.max(len - GAP, 0.5);
-    const arc = `<circle r="${R}" cx="64" cy="64" fill="none" stroke="${p.color}" stroke-width="${W}" stroke-dasharray="${dash} ${C - dash}" stroke-dashoffset="${-off}">
-      <title>${esc(p.c)} ${won(p.v)} (${Math.round(p.v / total * 100)}%)${p.etc ? ' · ' + esc(p.etc) : ''}</title></circle>`;
+    const len = p.v / total * C, dash = Math.max(len - GAP, 0.5), pct = Math.round(p.v / total * 100);
+    const mid = (off + len / 2) / C * 2 * Math.PI - Math.PI / 2, lr = R + W / 2 + 10; // 조각 가운데 각도, 12시에서 시계방향
+    const x = CX + Math.cos(mid) * lr, y = CY + Math.sin(mid) * lr, anchor = Math.abs(Math.cos(mid)) < 0.25 ? 'middle' : Math.cos(mid) > 0 ? 'start' : 'end';
+    const jump = p.etc ? '' : ` data-jump="지출|${esc(p.c)}"`;
+    labels += `<g class="pl"${jump}><text x="${x}" y="${y - 1}" text-anchor="${anchor}" class="pl-n">${esc(p.c)}</text>
+      <text x="${x}" y="${y + 12}" text-anchor="${anchor}" class="pl-v">${pct}% · ${compact(p.v)}</text></g>`;
+    const arc = `<circle r="${R}" cx="${CX}" cy="${CY}" fill="none" stroke="${p.color}" stroke-width="${W}" stroke-dasharray="${dash} ${C - dash}" stroke-dashoffset="${-off}" transform="rotate(-90 ${CX} ${CY})"${jump}>
+      <title>${esc(p.c)} ${won(p.v)} (${pct}%)${p.etc ? ' · ' + esc(p.etc) : ''}</title></circle>`;
     off += len; return arc;
   }).join('');
-  return `<div class="pie">
-    <svg viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="카테고리별 지출 비율">
-      <g transform="rotate(-90 64 64)">${arcs}</g>
-      ${paceText(total)}</svg>
-    <ul class="pie-leg">${parts.map(p => `<li${p.c === '기타' ? ` title="${esc(p.etc)}"` : ` data-jump="지출|${esc(p.c)}"`}>
-      <i style="background:${p.color}"></i><span class="n">${esc(p.c)}</span><span class="v num">${compact(p.v)}</span><b class="num">${Math.round(p.v / total * 100)}%</b></li>`).join('')}</ul>
-  </div>`;
+  return `<div class="pie"><svg viewBox="0 0 340 236" role="img" aria-label="카테고리별 지출 비율">${arcs}${labels}${paceText(total, CX, CY)}</svg></div>`;
 }
 
 // 원그래프 가운데: 쓴 돈 + 평소 이맘때(최근 12개월 같은 기간 평균) 대비 %
-function paceText(total) {
+function paceText(total, X = 64, Y = 64) {
   const pace = state.pace, avg = pace ? pace.avg('지출') : 0;
   const p = avg ? Math.round((total - avg) / avg * 100) : null;
   const tip = avg ? `<title>평소 ${pace.live ? '이맘때' : ''} ${won(avg)} (최근 ${pace.n}개월 ${pace.live ? `${pace.k}일째까지 ` : ''}평균)</title>` : '';
-  if (p === null) return `<text x="64" y="60" text-anchor="middle" class="p-top">쓴 돈</text><text x="64" y="78" text-anchor="middle" class="p-val">${compact(total)}</text>`;
-  return `<g>${tip}<text x="64" y="52" text-anchor="middle" class="p-top">쓴 돈</text><text x="64" y="69" text-anchor="middle" class="p-val">${compact(total)}</text>
-    <text x="64" y="85" text-anchor="middle" class="p-cmp ${p > 0 ? 'up' : p < 0 ? 'down' : ''}">평소보다 ${p > 0 ? '▲' : p < 0 ? '▼' : ''}${Math.abs(p)}%</text></g>`;
+  if (p === null) return `<text x="${X}" y="${Y - 4}" text-anchor="middle" class="p-top">쓴 돈</text><text x="${X}" y="${Y + 16}" text-anchor="middle" class="p-val">${compact(total)}</text>`;
+  return `<g>${tip}<text x="${X}" y="${Y - 14}" text-anchor="middle" class="p-top">쓴 돈</text><text x="${X}" y="${Y + 6}" text-anchor="middle" class="p-val">${compact(total)}</text>
+    <text x="${X}" y="${Y + 24}" text-anchor="middle" class="p-cmp ${p > 0 ? 'up' : p < 0 ? 'down' : ''}">평소보다 ${p > 0 ? '▲' : p < 0 ? '▼' : ''}${Math.abs(p)}%</text></g>`;
 }
 
 // 카테고리마다 자기 눈금: 최근 12개월 평균의 2배(쓴 돈·예산이 더 크면 그만큼)를 1·2·5 단위로 올림.
@@ -593,7 +594,16 @@ function openBudget() {
   const [y, m] = state.period.split('-').map(Number), v = sumOf(catBudgetsOf(state.period).map);
   $('#b-title').textContent = `${y}년 ${m}월 전체 예산`;
   $('#b-amount').value = v ? v.toLocaleString('ko-KR') : '';
+  // 끌어서 정하는 막대: 끝은 최근 12개월 월평균 지출의 2배(최소 300만)를 1·2·5 단위로 올림, 1만원씩
+  const avg = baseline(state.period).avg('지출'), max = catScale(v, avg * 2 / 1.2, 1500000);
+  const sl = $('#b-slider'); sl.max = max; sl.step = 10000; sl.value = v || Math.round(avg / 10000) * 10000;
+  $('#b-scale').innerHTML = `<span>0</span>${avg ? `<span class="b-avg" style="left:${avg / max * 100}%">▲ 최근 평균 ${compact(avg)}</span>` : ''}<span>${compact(max)}</span>`;
+  if (!v && avg) $('#b-amount').value = Number(sl.value).toLocaleString('ko-KR');
+  paintBudgetSlider();
   $('#budget-editor').showModal(); $('#b-amount').focus();
+}
+function paintBudgetSlider() { // 막대의 채워진 부분 색칠
+  const sl = $('#b-slider'); sl.style.setProperty('--p', `${Math.min(100, sl.value / sl.max * 100)}%`);
 }
 function saveBudget() {
   const v = Number($('#b-amount').value.replace(/[^\d]/g, ''));
@@ -1128,7 +1138,7 @@ $('#trend-chart').addEventListener('click', ev => {
   renderTrend();
 });
 document.addEventListener('click', ev => {
-  const b = ev.target.closest('button, .item, .bar-row, .cb-head, .pie-leg li[data-jump]'); if (!b) return;
+  const b = ev.target.closest('button, .item, .bar-row, .cb-head, .pie [data-jump]'); if (!b) return;
   const d = b.dataset;
   if (d.view) { if (b.closest('dialog')) b.closest('dialog').close(); return go(d.view); }
   if (d.type) { state.type = d.type; state.category = cats(d.type)[0]; return renderForm(); }
@@ -1197,7 +1207,8 @@ $('#s-rv-days').addEventListener('change', e => saveReviewCfg({ days: Number(e.t
 $('#g-text').addEventListener('keydown', e => { if (e.key === 'Enter') saveGoal(); });
 $('#f-amount').addEventListener('input', () => setAmount(amountValue()));
 $('#summary').addEventListener('pointerdown', budDragStart);
-$('#b-amount').addEventListener('input', e => { const n = Number(e.target.value.replace(/[^\d]/g, '')); e.target.value = n ? n.toLocaleString('ko-KR') : ''; });
+$('#b-amount').addEventListener('input', e => { const n = Number(e.target.value.replace(/[^\d]/g, '')); e.target.value = n ? n.toLocaleString('ko-KR') : ''; $('#b-slider').value = n; paintBudgetSlider(); });
+$('#b-slider').addEventListener('input', e => { $('#b-amount').value = Number(e.target.value).toLocaleString('ko-KR'); paintBudgetSlider(); });
 $('#b-amount').addEventListener('keydown', e => { if (e.key === 'Enter') saveBudget(); });
 $('#f-amount').addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
 $('#flt-type').addEventListener('change', e => { state.fltType = e.target.value; renderList(); });
