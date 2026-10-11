@@ -497,7 +497,7 @@ function renderStatus() {
   const [head, sub] = !periodEntries(key).length ? ['이번 달도 같이 시작해 봐요', `${m}월 ${day}일째`]
     : cur.sat != null && last.sat != null && cur.sat > last.sat ? ['요즘 아주 잘 쓰고 있어요!', `${m}월 ${day}일째 · 만족한 소비가 지난달보다 늘었어요`]
     : cur.regret > last.regret && cur.regret >= 2 ? ['요즘 좀 지쳤나 봐요', `후회한 소비가 늘었어요 · 천천히 가요`]
-    : cur.held ? ['잘 참고 있어요!', `${m}월 ${day}일째 · 이번 달 ${cur.held}번 참았어요`]
+    : cur.held ? ['잘 참고 있어요!', `${m}월 ${day}일째`]
     : ['차곡차곡 기록 중이에요', `${m}월 ${day}일째`];
   const list = badgesOf(key), ps = list.map(b => badgeProgress(b, key));
   const goal = (state.settings.goals || {})[key] || '', rq = reviewQueue().length;
