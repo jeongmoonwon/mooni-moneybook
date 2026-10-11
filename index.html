@@ -39,53 +39,27 @@
 <main class="wrap">
   <p class="demo-banner">데모 모드예요. 이 브라우저에만 저장돼요. (firebase-config.js를 채우면 로그인·동기화가 켜져요)</p>
 
-  <!-- 기록 -->
-  <section class="view on" id="view-add">
-    <div class="card" id="form-card">
-      <div class="edit-banner">기록을 수정하고 있어요</div>
-      <div class="seg" id="type-seg" role="group" aria-label="구분"></div>
-
-      <div class="field row date-row">
-        <button class="step" data-shift="-1" aria-label="전날">‹</button>
-        <input class="input" type="date" id="f-date">
-        <button class="step" data-shift="1" aria-label="다음날">›</button>
-      </div>
-
-      <div class="field">
-        <p class="label">카테고리</p>
-        <div class="chips" id="cat-chips"></div>
-      </div>
-
-      <div class="field">
-        <p class="label">상세내역</p>
-        <input class="input" id="f-detail" autocomplete="off">
-        <div class="chips" id="suggest" style="margin-top:8px"></div>
-      </div>
-
-      <div class="field">
-        <p class="label">금액</p>
-        <input class="input amount num" id="f-amount" inputmode="numeric" placeholder="0" autocomplete="off">
-        <div class="quick">
-          <button class="chip sm" data-add="1000">+1천</button>
-          <button class="chip sm" data-add="5000">+5천</button>
-          <button class="chip sm" data-add="10000">+1만</button>
-          <button class="chip sm" data-add="50000">+5만</button>
-          <button class="chip sm" data-add="0">지우기</button>
-        </div>
-      </div>
-
-      <div class="field">
-        <p class="label">메모 (선택)</p>
-        <input class="input" id="f-memo" autocomplete="off">
-      </div>
-
-      <div class="actions" id="form-actions"></div>
-    </div>
-
+  <!-- 홈 -->
+  <section class="view on" id="view-home">
+    <div id="home-goal"></div>
+    <div id="home-budget"></div>
+    <div id="home-review"></div>
+    <div id="home-held"></div>
     <div class="card">
-      <h2 id="day-title">오늘 기록</h2>
-      <ul class="list" id="day-list"></ul>
+      <div class="card-head" style="margin:0 0 10px">
+        <h2 style="margin:0" id="week-title">이번 주</h2>
+        <div style="display:flex;gap:4px"><button class="step sm" data-hweek="-7" aria-label="이전 주">‹</button><button class="step sm" data-hweek="7" aria-label="다음 주">›</button></div>
+      </div>
+      <div class="week" id="home-week"></div>
     </div>
+    <div class="card">
+      <h2 id="day-title">오늘</h2>
+      <ul class="list" id="day-list"></ul>
+      <p class="day-sum num" id="day-sum"></p>
+    </div>
+    <button class="fab" id="open-entry" aria-label="기록 추가">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
   </section>
 
   <!-- 한 달 -->
@@ -97,6 +71,8 @@
       <div class="tiles" id="save-tiles"></div>
       <div class="bars" id="save-bars" style="margin-top:14px"></div>
     </div>
+    <div class="card" id="feel-card"></div>
+    <div class="card" id="held-card"></div>
     <div class="card">
       <h2>달력</h2>
       <div class="cal" id="cal"></div>
@@ -141,8 +117,8 @@
 </main>
 
 <nav class="tabs"><div class="wrap" role="tablist">
-  <button role="tab" data-view="add" aria-selected="true">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>기록</button>
+  <button role="tab" data-view="home" aria-selected="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/></svg>홈</button>
   <button role="tab" data-view="month" aria-selected="false">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="12" width="3.5" height="8" rx="1"/><rect x="10.25" y="7" width="3.5" height="13" rx="1"/><rect x="16.5" y="4" width="3.5" height="16" rx="1"/></svg>한 달</button>
   <button role="tab" data-view="list" aria-selected="false">
@@ -169,6 +145,18 @@
   <div class="set-row">
     <div><b>카테고리</b><p>추가 · 삭제 · 이름 바꾸기</p></div>
     <button class="chip" id="open-cats">편집</button>
+  </div>
+  <div class="set-row">
+    <div><b>소비 리뷰 금액</b><p>이 금액 이상인 지출만 나중에 만족도를 물어봐요</p></div>
+    <input class="input num" id="s-rv-min" inputmode="numeric" autocomplete="off" style="width:120px;text-align:right">
+  </div>
+  <div class="set-row">
+    <div><b>소비 리뷰 시점</b><p>쓴 날로부터 며칠 뒤에 물어볼까요</p></div>
+    <select class="input" id="s-rv-days"></select>
+  </div>
+  <div class="set-row" style="display:block">
+    <div><b>소비 리뷰 카테고리</b><p>고른 카테고리의 지출만 물어봐요</p></div>
+    <div class="chips" id="s-rv-cats" style="margin-top:8px"></div>
   </div>
   <div class="set-row">
     <div><b>CSV 가져오기</b><p>내보낸 CSV나 이전 내역 파일을 불러와요</p></div>
@@ -203,6 +191,70 @@
   <p class="note">이름을 누르면 바로 바꿀 수 있어요. 바꾼 이름은 예전 기록에도 적용돼요.</p>
   <div class="actions"><button class="btn ghost" data-close>닫기</button></div>
 </div></dialog>
+
+<!-- 기록하기 (아래에서 올라오는 창) -->
+<dialog id="entry-sheet" class="sheet"><div class="body" id="form-card">
+  <div class="sheet-head"><h2 id="entry-title">기록하기</h2><button class="icon-btn" data-close aria-label="닫기">✕</button></div>
+      <div class="edit-banner">기록을 수정하고 있어요</div>
+      <div class="seg" id="type-seg" role="group" aria-label="구분"></div>
+
+      <div class="field row date-row">
+        <button class="step" data-shift="-1" aria-label="전날">‹</button>
+        <input class="input" type="date" id="f-date">
+        <button class="step" data-shift="1" aria-label="다음날">›</button>
+      </div>
+
+      <div class="field">
+        <p class="label">카테고리</p>
+        <div class="chips" id="cat-chips"></div>
+      </div>
+
+      <div class="field">
+        <p class="label">상세내역</p>
+        <input class="input" id="f-detail" autocomplete="off">
+        <div class="chips" id="suggest" style="margin-top:8px"></div>
+      </div>
+
+      <div class="field">
+        <p class="label">금액</p>
+        <input class="input amount num" id="f-amount" inputmode="numeric" placeholder="0" autocomplete="off">
+        <div class="quick">
+          <button class="chip sm" data-add="1000">+1천</button>
+          <button class="chip sm" data-add="5000">+5천</button>
+          <button class="chip sm" data-add="10000">+1만</button>
+          <button class="chip sm" data-add="50000">+5만</button>
+          <button class="chip sm" data-add="0">지우기</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <p class="label">메모 (선택)</p>
+        <input class="input" id="f-memo" autocomplete="off">
+      </div>
+
+      <div class="actions" id="form-actions"></div>
+</div></dialog>
+
+<!-- 참은 소비 -->
+<dialog id="held-sheet" class="sheet"><div class="body">
+  <div class="sheet-head"><h2 id="h-title">🙌 참은 소비</h2><button class="icon-btn" data-close aria-label="닫기">✕</button></div>
+  <div class="field"><p class="label">날짜</p><input class="input" type="date" id="h-date"></div>
+  <div class="field"><p class="label">무엇을 참았나요?</p><input class="input" id="h-what" autocomplete="off" maxlength="40"></div>
+  <div class="field"><p class="label">대신 어떻게 했나요? (선택)</p><input class="input" id="h-how" autocomplete="off" maxlength="60"></div>
+  <div class="field"><p class="label">아낀 금액 (선택)</p><input class="input amount num" id="h-amount" inputmode="numeric" placeholder="0" autocomplete="off"></div>
+  <div class="actions" id="h-actions"></div>
+</div></dialog>
+
+<!-- 이번 달 목표 -->
+<dialog id="goal-editor"><div class="body">
+  <h2 id="g-title">이번 달 목표</h2>
+  <input class="input" id="g-text" autocomplete="off" maxlength="60">
+  <p class="note">앱을 켜면 맨 위에 보여요. 비우고 저장하면 지워져요.</p>
+  <div class="actions"><button class="btn ghost" data-close>취소</button><button class="btn primary" data-goalok>저장</button></div>
+</div></dialog>
+
+<!-- 소비 리뷰 -->
+<dialog id="review"><div class="body" id="rv-body"></div></dialog>
 
 <!-- 예산 -->
 <dialog id="budget-editor"><div class="body">

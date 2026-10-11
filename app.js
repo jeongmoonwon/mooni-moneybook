@@ -55,8 +55,8 @@ function toast(msg) {
 /* ================= 상태 ================= */
 let store = null;
 const state = {
-  user: null, entries: [], settings: { payday: 25 }, pending: false,
-  view: 'add', type: '지출', category: '식비', date: today(), editing: null,
+  user: null, entries: [], held: [], settings: { payday: 25 }, pending: false,
+  view: 'home', homeDay: today(), type: '지출', category: '식비', date: today(), editing: null, heldEditing: null, rv: [], rvI: 0,
   period: null, calDay: null, trendType: '지출', trendCat: '', fltType: '', fltCat: '', q: '', visible: [],
   info: false, ceType: '지출', ceDelete: null,
 };
@@ -73,7 +73,7 @@ function renderSync() {
   $('#sync').textContent = store.demo ? '' : !navigator.onLine ? '오프라인 · 연결되면 동기화' : state.pending ? '동기화 중…' : '동기화됨';
 }
 
-/* ================= 기록 탭 ================= */
+/* ================= 기록하기 창 ================= */
 function renderForm() {
   if (!cats(state.type).includes(state.category)) state.category = cats(state.type)[0];
   $('#type-seg').innerHTML = TYPES.map(t =>
@@ -83,13 +83,13 @@ function renderForm() {
     + '<button class="chip ghost-chip" id="open-cats">＋ 편집</button>';
   $('#f-date').value = state.date;
   $('#form-card').classList.toggle('editing', !!state.editing);
+  $('#entry-title').textContent = state.editing ? '기록 수정' : '기록하기';
   $('#form-actions').innerHTML = state.editing
     ? `<button class="btn danger" id="del" style="width:auto;padding:14px 18px">삭제</button>
        <button class="btn ghost" id="cancel" style="width:auto;padding:14px 18px">취소</button>
        <button class="btn primary" id="submit">수정 저장</button>`
     : `<button class="btn primary" id="submit">저장</button>`;
   renderSuggest();
-  renderDayList();
 }
 
 // 전체 기간 기록에서 이 카테고리 상세내역의 사용 횟수가 많은 순
@@ -104,19 +104,18 @@ function renderSuggest() {
   $('#suggest').innerHTML = top.map(d => `<button class="chip sm" data-detail="${esc(d)}">${esc(d)}</button>`).join('');
 }
 
-function renderDayList() {
-  const list = state.entries.filter(e => e.date === state.date);
-  const d = parse(state.date);
-  $('#day-title').textContent = (state.date === today() ? '오늘' : `${d.getMonth() + 1}월 ${d.getDate()}일 (${WD[d.getDay()]})`) + ' 기록';
-  $('#day-list').innerHTML = list.length ? list.map(itemHtml).join('') : '<li class="empty">아직 기록이 없어요</li>';
-}
-
 function itemHtml(e) {
   return `<li class="item" data-id="${esc(e.id)}">
     <span class="dot" style="background:${TYPE_COLOR[e.type]}"></span>
     <div class="main"><div class="cat">${e.type} · ${esc(e.category)}</div>
-      <div class="det">${esc(e.detail || '—')}${e.memo ? ` <span class="cat">· ${esc(e.memo)}</span>` : ''}</div></div>
+      <div class="det">${esc(e.detail || '—')}${FEELS[e.feel] ? ` <span title="${e.feel}">${FEELS[e.feel]}</span>` : ''}${e.memo ? ` <span class="cat">· ${esc(e.memo)}</span>` : ''}</div></div>
     <div class="amt num">${sign(e)}${won(e.amount)}</div></li>`;
+}
+function heldItemHtml(h) {
+  return `<li class="item" data-held="${esc(h.id)}">
+    <span class="held-ic">🙌</span>
+    <div class="main"><div class="cat">참은 소비${h.memo ? ` · ${esc(h.memo)}` : ''}</div><div class="det">${esc(h.detail)}</div></div>
+    <div class="amt num saved">${h.amount ? won(h.amount) + ' 아낌' : ''}</div></li>`;
 }
 
 function amountValue() { return Number($('#f-amount').value.replace(/[^\d]/g, '')) || 0; }
@@ -128,11 +127,19 @@ function resetForm() {
   renderForm();
 }
 
+// 새 기록: 홈에서 고른 날짜(또는 달력에서 고른 날짜)로 기록하기 창을 연다
+function openEntry(day) {
+  state.date = day || state.homeDay;
+  resetForm();
+  $('#entry-sheet').showModal(); document.activeElement.blur();
+}
+
 function startEdit(id) {
   const e = state.entries.find(x => x.id === id); if (!e) return;
   state.editing = e; state.type = e.type; state.category = e.category; state.date = e.date;
   $('#f-detail').value = e.detail; setAmount(e.amount); $('#f-memo').value = e.memo || '';
-  go('add'); renderForm(); window.scrollTo({ top: 0, behavior: 'smooth' });
+  renderForm();
+  if (!$('#entry-sheet').open) $('#entry-sheet').showModal();
 }
 
 // 저장하면 화면에는 바로 반영되고, 클라우드 동기화는 뒤에서 진행된다 (오프라인이면 연결될 때까지 대기).
@@ -143,10 +150,11 @@ function submit() {
   const e = {
     id: prev ? prev.id : newId(), date: $('#f-date').value || today(),
     type: state.type, category: state.category,
-    detail: $('#f-detail').value.trim(), amount, memo: $('#f-memo').value.trim(),
+    detail: $('#f-detail').value.trim(), amount, memo: $('#f-memo').value.trim(), feel: prev && prev.feel,
   };
-  state.date = e.date;
+  state.date = state.homeDay = e.date;
   resetForm();
+  $('#entry-sheet').close();
   store.save(e, prev).catch(err => toast('동기화 실패: ' + errMsg(err)));
   toast(prev ? '수정했어요' : `${e.category} ${won(e.amount)} 저장`);
 }
@@ -154,8 +162,152 @@ function submit() {
 function removeEditing() {
   const e = state.editing; if (!e || !confirm(`${e.category} ${won(e.amount)} 기록을 삭제할까요?`)) return;
   resetForm();
+  $('#entry-sheet').close();
   store.remove(e).catch(err => toast('동기화 실패: ' + errMsg(err)));
   toast('삭제했어요');
+}
+
+/* ================= 홈 ================= */
+const HELD = '참음'; // 참은 소비는 기록과 같은 곳에 이 구분으로 저장
+const FEELS = { '필수': '🧾', '만족': '😊', '후회': '😣' };
+
+function renderHome() {
+  const key = periodOfDate(today()), m = Number(key.slice(5));
+  const goal = (state.settings.goals || {})[key] || '';
+  $('#home-goal').innerHTML = goal
+    ? `<button class="goal" data-goal><span class="e">🎯</span><span class="g-main"><small>${m}월 목표</small><b>${esc(goal)}</b></span><span class="pen">✎</span></button>`
+    : `<button class="goal empty" data-goal><span class="e">🎯</span><span class="g-main"><b>${m}월 소비 목표를 정해 보세요</b><small>앱을 켤 때마다 여기에 보여요</small></span></button>`;
+
+  // 이번 달 예산 한 줄 (누르면 한 달 탭)
+  const { end } = periodRange(key);
+  const spent = state.entries.filter(e => e.type === '지출' && periodOf(e) === key).reduce((s, e) => s + e.amount, 0);
+  const budget = budgetOf(key).v, rest = budget - spent;
+  const left = Math.round((parse(end) - parse(today())) / 864e5) + 1;
+  $('#home-budget').innerHTML = budget
+    ? `<button class="sumline" data-view="month"><span><span class="label">${rest < 0 ? '예산 초과' : '남은 예산'}</span>
+        <b class="num ${rest < 0 ? 'over' : ''}">${rest < 0 ? '−' : ''}${won(Math.abs(rest))}</b>
+        <span class="minibar"><i style="width:${Math.min(100, spent / budget * 100)}%"></i></span></span>
+        <span class="r"><span class="label">하루에</span><b class="num">${won(Math.max(rest, 0) / left)}</b></span></button>`
+    : `<button class="sumline" data-budget="${key}"><span><span class="label">이번 달 쓴 돈</span><b class="num">${won(spent)}</b></span>
+        <span class="r"><span class="label">예산을 정하면 남은 돈을 알려줘요</span><b class="link">예산 정하기 ›</b></span></button>`;
+
+  const n = reviewQueue().length;
+  $('#home-review').innerHTML = n ? `<button class="review-card" data-review><span class="e">💭</span>
+    <span><b>리뷰할 소비 ${n}개</b><small>${reviewCfg().days}일 전에 쓴 돈, 지금 돌아보니 어때요?</small></span><span class="go">›</span></button>` : '';
+
+  const held = state.held.filter(h => periodOf(h) === key), saved = held.reduce((s, h) => s + h.amount, 0);
+  $('#home-held').innerHTML = `<div class="held-card"><span class="e">🙌</span>
+    <span>${held.length ? `<b>이번 달 참은 소비 ${held.length}번</b><small>${saved ? won(saved) + ' 아꼈어요' : '잘 참았어요!'}</small>`
+      : '<b>사려다 참은 게 있나요?</b><small>참은 것도 기록해 두면 뿌듯해요</small>'}</span>
+    <button class="chip sm" data-held="">+ 참았어요</button></div>`;
+
+  // 고른 날이 들어 있는 주 (일~토)
+  const t = today(), sun = addDays(state.homeDay, -parse(state.homeDay).getDay());
+  const ex = sumBy(state.entries.filter(e => e.type === '지출'), e => e.date);
+  $('#week-title').textContent = sun === addDays(t, -parse(t).getDay()) ? '이번 주' : `${md(sun).replace('.', '월 ')}일 주`;
+  $('#home-week').innerHTML = Array.from({ length: 7 }, (_, i) => {
+    const s = addDays(sun, i), d = parse(s);
+    return `<button data-homeday="${s}" aria-pressed="${s === state.homeDay}" class="${s === t ? 'today' : ''}">
+      <small>${WD[i]}</small><b>${d.getDate()}</b><i class="${ex.get(s) ? 'on' : ''}"></i></button>`;
+  }).join('');
+
+  const d = parse(state.homeDay), list = state.entries.filter(e => e.date === state.homeDay), hl = state.held.filter(h => h.date === state.homeDay);
+  $('#day-title').textContent = `${state.homeDay === t ? '오늘 · ' : ''}${d.getMonth() + 1}월 ${d.getDate()}일 (${WD[d.getDay()]})`;
+  $('#day-list').innerHTML = list.length || hl.length ? list.map(itemHtml).join('') + hl.map(heldItemHtml).join('') : '<li class="empty">아직 기록이 없어요</li>';
+  const dayEx = ex.get(state.homeDay) || 0;
+  $('#day-sum').textContent = dayEx ? `지출 합계 −${won(dayEx)}` : '';
+}
+
+/* ================= 이번 달 목표 ================= */
+function openGoal() {
+  state.goalKey = periodOfDate(today());
+  $('#g-title').textContent = `${Number(state.goalKey.slice(5))}월 소비 목표`;
+  $('#g-text').value = (state.settings.goals || {})[state.goalKey] || '';
+  $('#goal-editor').showModal(); $('#g-text').focus();
+}
+function saveGoal() {
+  $('#goal-editor').close();
+  store.saveSettings({ goals: { ...state.settings.goals, [state.goalKey]: $('#g-text').value.trim() } }).catch(err => toast('목표 저장 실패: ' + errMsg(err)));
+}
+
+/* ================= 참은 소비 ================= */
+function openHeld(id) {
+  const h = state.heldEditing = state.held.find(x => x.id === id) || null;
+  $('#h-title').textContent = h ? '🙌 참은 소비 수정' : '🙌 참은 소비';
+  $('#h-date').value = h ? h.date : state.homeDay;
+  $('#h-what').value = h ? h.detail : ''; $('#h-how').value = h ? h.memo : '';
+  $('#h-amount').value = h && h.amount ? h.amount.toLocaleString('ko-KR') : '';
+  $('#h-actions').innerHTML = (h ? '<button class="btn danger" data-helddel style="width:auto;padding:14px 18px">삭제</button>' : '')
+    + '<button class="btn primary" data-heldok>저장</button>';
+  $('#held-sheet').showModal();
+}
+function saveHeld() {
+  const what = $('#h-what').value.trim();
+  if (!what) { toast('무엇을 참았는지 적어 주세요'); return $('#h-what').focus(); }
+  const prev = state.heldEditing;
+  const h = { id: prev ? prev.id : newId(), date: $('#h-date').value || today(), type: HELD, category: '', detail: what,
+    memo: $('#h-how').value.trim(), amount: Number($('#h-amount').value.replace(/[^\d]/g, '')) || 0 };
+  $('#held-sheet').close();
+  store.save(h, prev).catch(err => toast('동기화 실패: ' + errMsg(err)));
+  toast(prev ? '수정했어요' : '잘 참았어요! 🙌');
+}
+function removeHeld() {
+  const h = state.heldEditing; if (!h || !confirm(`'${h.detail}' 기록을 삭제할까요?`)) return;
+  $('#held-sheet').close();
+  store.remove(h).catch(err => toast('동기화 실패: ' + errMsg(err)));
+}
+
+/* ================= 소비 리뷰 ================= */
+// 고른 카테고리(기본: 전체) 중 min원 이상 지출을, 쓴 지 days일 지나면 물어본다. 너무 오래된 건 묻지 않음(그 뒤 30일까지만)
+const REVIEW_DEFAULT = { min: 50000, days: 7, cats: null };
+const reviewCfg = () => ({ ...REVIEW_DEFAULT, ...(state.settings.review || {}) });
+function reviewQueue() {
+  const { min, days, cats: rc } = reviewCfg(), until = addDays(today(), -days), from = addDays(until, -30);
+  return state.entries.filter(e => e.type === '지출' && !e.feel && e.date >= from && e.date <= until
+    && e.amount >= min && (!rc || rc.includes(e.category))).sort((a, b) => a.date.localeCompare(b.date));
+}
+function openReview() {
+  state.rv = reviewQueue(); state.rvI = 0;
+  renderReview(); $('#review').showModal(); document.activeElement.blur(); // 첫 버튼에 포커스 테두리가 생기지 않게
+}
+function renderReview() {
+  const e = state.rv[state.rvI];
+  if (!e) {
+    $('#rv-body').innerHTML = `<div class="rv-done"><span>👏</span><h2>다 돌아봤어요</h2><p class="note">한 달 탭에서 이번 달 소비 만족도를 볼 수 있어요</p>
+      <div class="actions"><button class="btn ghost" data-close>닫기</button><button class="btn primary" data-view="month">만족도 보기</button></div></div>`;
+    return;
+  }
+  const d = parse(e.date), ago = Math.round((parse(today()) - d) / 864e5);
+  $('#rv-body').innerHTML = `<div class="rv-prog"><span>소비 리뷰</span><span>${state.rvI + 1} / ${state.rv.length}</span></div>
+    <div class="rv-card"><p class="rv-when">${d.getMonth() + 1}월 ${d.getDate()}일 (${WD[d.getDay()]}) · ${ago}일 전</p>
+      <h3>${esc(e.detail || e.category)}</h3><span class="rv-cat">지출 · ${esc(e.category)}</span>
+      <div class="rv-amt num">${won(e.amount)}</div>
+      <p class="rv-q">지금 돌아보니 어때요?</p>
+      <div class="rv-choices">${Object.entries(FEELS).map(([f, ic]) => `<button data-feel="${f}"><span>${ic}</span>${f}</button>`).join('')}</div></div>
+    <div class="actions"><button class="btn ghost" data-close>나중에</button><button class="btn ghost" data-feel="skip">이건 안 물어보기</button></div>`;
+}
+function answerReview(feel) {
+  const e = state.rv[state.rvI]; if (!e) return;
+  store.save({ ...e, feel }, e).catch(err => toast('동기화 실패: ' + errMsg(err)));
+  state.rvI++; renderReview();
+}
+
+function saveReviewCfg(patch) {
+  store.saveSettings({ review: { ...reviewCfg(), ...patch } }).catch(err => toast('설정 저장 실패: ' + errMsg(err)));
+}
+function renderReviewCats() {
+  const rc = reviewCfg().cats;
+  $('#s-rv-cats').innerHTML = `<button class="chip sm" data-rvcat="" aria-pressed="${!rc}">전체</button>`
+    + cats('지출').map(c => `<button class="chip sm" data-rvcat="${esc(c)}" aria-pressed="${!rc || rc.includes(c)}">${esc(c)}</button>`).join('');
+}
+// '전체'를 누르면 모두 선택. 카테고리를 누르면 켜고 끄기 (다 켜지면 다시 '전체')
+function toggleReviewCat(c) {
+  const all = cats('지출'), cur = reviewCfg().cats || all;
+  let next = c === '' ? null : cur.includes(c) ? cur.filter(x => x !== c) : [...cur, c];
+  if (next && all.every(x => next.includes(x))) next = null;
+  state.settings.review = { ...reviewCfg(), cats: next }; // 화면 먼저 바꾸고 저장은 뒤에서
+  renderReviewCats();
+  saveReviewCfg({ cats: next });
 }
 
 /* ================= 한 달 탭 ================= */
@@ -254,8 +406,35 @@ function renderMonth() {
   $('#cat-bars').innerHTML = barsHtml(sumBy(exp, e => e.category), 'var(--s1)', '지출');
   const sv = list.filter(e => e.type === '저축' || e.type === '투자');
   $('#save-bars').innerHTML = barsHtml(sumBy(sv, e => e.type + '|' + e.category), null, null);
+  renderFeel(list.filter(e => e.type === '지출'));
+  renderHeldCard(state.held.filter(h => periodOf(h) === state.period));
 
   renderCalendar();
+}
+
+// 소비 만족도: 리뷰한 지출을 금액 기준으로 필수·만족·후회 비율로. 후회한 소비는 큰 순서로
+function renderFeel(exp) {
+  const done = exp.filter(e => FEELS[e.feel]), total = done.reduce((s, e) => s + e.amount, 0);
+  const { min, days } = reviewCfg();
+  if (!done.length) {
+    $('#feel-card').innerHTML = `<h2>소비 만족도</h2><p class="empty" style="padding:4px 0">아직 리뷰한 소비가 없어요<br>${won(min)} 이상 지출을 ${days}일 뒤 홈에서 물어봐요</p>`;
+    return;
+  }
+  const by = sumBy(done, e => e.feel), col = { '만족': 'var(--brand)', '필수': 'var(--base)', '후회': 'var(--s1)' };
+  const order = ['만족', '필수', '후회'], pct = f => Math.round((by.get(f) || 0) / total * 100);
+  const regret = done.filter(e => e.feel === '후회').sort((a, b) => b.amount - a.amount).slice(0, 3);
+  $('#feel-card').innerHTML = `<h2 style="margin-bottom:2px">소비 만족도</h2><p class="label">리뷰한 지출 ${done.length}건 · ${won(total)} 기준</p>
+    <div class="sat">${order.map(f => by.get(f) ? `<i style="flex:${by.get(f)};background:${col[f]}" title="${f} ${won(by.get(f))}"></i>` : '').join('')}</div>
+    <div class="sat-leg">${order.map(f => `<span>${FEELS[f]} ${f} <b class="num">${pct(f)}%</b></span>`).join('')}</div>
+    ${regret.length ? `<p class="label" style="margin-top:12px">후회한 소비</p><ul class="list">${regret.map(itemHtml).join('')}</ul>` : ''}`;
+}
+
+function renderHeldCard(held) {
+  const saved = held.reduce((s, h) => s + h.amount, 0);
+  $('#held-card').innerHTML = `<div class="card-head" style="margin:0 0 6px"><h2 style="margin:0">참은 소비</h2><button class="chip sm" data-held="">+ 참았어요</button></div>
+    ${held.length ? `<p class="label">${held.length}번 참았어요${saved ? ` · ${won(saved)} 아낌` : ''}</p>
+      <ul class="list">${held.slice().sort((a, b) => b.date.localeCompare(a.date)).map(heldItemHtml).join('')}</ul>`
+      : '<p class="empty" style="padding:4px 0">사려다 참은 게 있으면 기록해 보세요</p>'}`;
 }
 
 // 예산: 달마다 정하고, 정하지 않은 달은 직전에 정한 달의 예산을 그대로 쓴다
@@ -315,8 +494,9 @@ function budgetHtml(exp) {
     ${note}`;
 }
 
-function openBudget() {
-  const [y, m] = state.period.split('-').map(Number), v = budgetOf(state.period).v;
+function openBudget(key = state.period) {
+  state.budgetKey = key;
+  const [y, m] = key.split('-').map(Number), v = budgetOf(key).v;
   $('#b-title').textContent = `${y}년 ${m}월 예산`;
   $('#b-amount').value = v ? v.toLocaleString('ko-KR') : '';
   $('#budget-editor').showModal(); $('#b-amount').focus();
@@ -325,7 +505,7 @@ function saveBudget() {
   const v = Number($('#b-amount').value.replace(/[^\d]/g, ''));
   if (!v) { toast('예산을 입력해 주세요'); return $('#b-amount').focus(); }
   $('#budget-editor').close();
-  store.saveSettings({ budgets: { ...state.settings.budgets, [state.period]: v } }).catch(err => toast('예산 저장 실패: ' + errMsg(err)));
+  store.saveSettings({ budgets: { ...state.settings.budgets, [state.budgetKey]: v } }).catch(err => toast('예산 저장 실패: ' + errMsg(err)));
 }
 
 function barsHtml(map, color, type) {
@@ -389,14 +569,8 @@ function renderCalendar() {
     <ul class="list">${dayList.length ? dayList.map(itemHtml).join('') : '<li class="empty">이 날은 기록이 없어요</li>'}</ul>`;
 }
 
-// 달력에서 고른 날짜로 기록 탭을 연다
-function addOnDay(day) {
-  state.date = day;
-  go('add');
-  resetForm();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-  toast(`${md(day).replace('.', '월 ')}일 기록을 입력해요`);
-}
+// 달력에서 고른 날짜로 기록하기 창을 연다
+function addOnDay(day) { openEntry(day); }
 
 /* ================= 내역 탭 ================= */
 function renderList() {
@@ -579,7 +753,8 @@ function refreshAll() {
   if (!state.user) return;
   renderSync();
   renderTitle();
-  if (state.view === 'add') renderForm();
+  if ($('#entry-sheet').open) renderForm();
+  if (state.view === 'home') renderHome();
   if (state.view === 'month') renderMonth();
   if (state.view === 'list') renderList();
   if (state.view === 'trend') renderTrend();
@@ -715,6 +890,11 @@ function openSettings() {
   $('#sign-out').hidden = store.demo;
   $('#s-payday').innerHTML = Array.from({ length: 28 }, (_, i) => i + 1)
     .map(n => `<option value="${n}" ${n === state.settings.payday ? 'selected' : ''}>${n === 1 ? '매달 1일 (달력 그대로)' : `매달 ${n}일`}</option>`).join('');
+  const rv = reviewCfg();
+  $('#s-rv-min').value = rv.min ? rv.min.toLocaleString('ko-KR') : '';
+  $('#s-rv-days').innerHTML = Array.from({ length: 30 }, (_, i) => i + 1)
+    .map(n => `<option value="${n}" ${n === rv.days ? 'selected' : ''}>${n}일 뒤</option>`).join('');
+  renderReviewCats();
   $('#s-import-msg').textContent = '';
   $('#settings').showModal();
 }
@@ -757,7 +937,8 @@ async function importCsv(file) {
 
 /* ================= 이벤트 ================= */
 addEventListener('resize', () => { if (state.view === 'trend') renderTrend(); }); // 화면 폭이 바뀌면 그래프 폭도 다시 맞춤
-$('#month-picker').addEventListener('click', ev => { if (ev.target === ev.currentTarget) ev.currentTarget.close(); }); // 바깥 누르면 닫기
+document.querySelectorAll('dialog').forEach(dl => dl.addEventListener('click', ev => { if (ev.target === dl) dl.close(); })); // 바깥 누르면 닫기
+$('#entry-sheet').addEventListener('close', () => { state.editing = null; });
 $('#trend-chart').addEventListener('click', ev => {
   const r = ev.target.closest('[data-tm]'); if (!r) return;
   state.trendSel = state.trendSel === r.dataset.tm ? null : r.dataset.tm;
@@ -766,14 +947,24 @@ $('#trend-chart').addEventListener('click', ev => {
 document.addEventListener('click', ev => {
   const b = ev.target.closest('button, .item, .bar-row'); if (!b) return;
   const d = b.dataset;
-  if (d.view) return go(d.view);
+  if (d.view) { if (b.closest('dialog')) b.closest('dialog').close(); return go(d.view); }
   if (d.type) { state.type = d.type; state.category = cats(d.type)[0]; return renderForm(); }
   if (d.cat) { state.category = d.cat; return renderForm(); }
   if (d.detail) { $('#f-detail').value = d.detail; return $('#f-amount').focus(); }
   if (d.add !== undefined) { setAmount(d.add === '0' ? 0 : amountValue() + Number(d.add)); return; }
   if (d.shift) { state.date = addDays($('#f-date').value || today(), Number(d.shift)); return renderForm(); }
   if (d.pickmonth !== undefined) return openMonthPicker();
-  if (d.budget !== undefined) return openBudget();
+  if (d.budget !== undefined) return openBudget(d.budget || state.period);
+  if (d.homeday) { state.homeDay = d.homeday; return renderHome(); }
+  if (d.hweek) { state.homeDay = addDays(state.homeDay, Number(d.hweek)); return renderHome(); }
+  if (d.goal !== undefined) return openGoal();
+  if (d.goalok !== undefined) return saveGoal();
+  if (d.review !== undefined) return openReview();
+  if (d.feel) return answerReview(d.feel);
+  if (d.held !== undefined) return openHeld(d.held);
+  if (d.heldok !== undefined) return saveHeld();
+  if (d.helddel !== undefined) return removeHeld();
+  if (d.rvcat !== undefined) return toggleReviewCat(d.rvcat);
   if (d.budgetok !== undefined) return saveBudget();
   if (d.pickok !== undefined) {
     const y = parseInt($('#mp-y').children[wheelIndex($('#mp-y'))].textContent), m = wheelIndex($('#mp-m')) + 1;
@@ -792,7 +983,8 @@ document.addEventListener('click', ev => {
   if (d.cedel) return deleteCat(d.cedel);
   switch (b.id) {
     case 'submit': return submit();
-    case 'cancel': return resetForm();
+    case 'cancel': resetForm(); return $('#entry-sheet').close();
+    case 'open-entry': return openEntry();
     case 'del': return removeEditing();
     case 'open-settings': return openSettings();
     case 'open-export': return openExport();
@@ -807,7 +999,12 @@ document.addEventListener('click', ev => {
     case 'sign-out': $('#settings').close(); return store.signOut();
   }
 });
-$('#f-date').addEventListener('change', e => { state.date = e.target.value || today(); renderDayList(); });
+$('#f-date').addEventListener('change', e => { state.date = e.target.value || today(); });
+$('#h-amount').addEventListener('input', e => { const n = Number(e.target.value.replace(/[^\d]/g, '')); e.target.value = n ? n.toLocaleString('ko-KR') : ''; });
+$('#s-rv-min').addEventListener('input', e => { const n = Number(e.target.value.replace(/[^\d]/g, '')); e.target.value = n ? n.toLocaleString('ko-KR') : ''; });
+$('#s-rv-min').addEventListener('change', e => saveReviewCfg({ min: Number(e.target.value.replace(/[^\d]/g, '')) || 0 }));
+$('#s-rv-days').addEventListener('change', e => saveReviewCfg({ days: Number(e.target.value) }));
+$('#g-text').addEventListener('keydown', e => { if (e.key === 'Enter') saveGoal(); });
 $('#f-amount').addEventListener('input', () => setAmount(amountValue()));
 $('#b-amount').addEventListener('input', e => { const n = Number(e.target.value.replace(/[^\d]/g, '')); e.target.value = n ? n.toLocaleString('ko-KR') : ''; });
 $('#b-amount').addEventListener('keydown', e => { if (e.key === 'Enter') saveBudget(); });
@@ -839,7 +1036,8 @@ addEventListener('offline', renderSync);
 /* ================= 시작 ================= */
 function onData(data) {
   const paydayChanged = data.settings.payday !== state.settings.payday;
-  state.entries = data.entries; state.settings = data.settings; state.pending = data.pending;
+  state.entries = data.entries.filter(e => e.type !== HELD); state.held = data.entries.filter(e => e.type === HELD); // 참은 소비는 합계에 안 섞이게 따로
+  state.settings = data.settings; state.pending = data.pending;
   if (paydayChanged || !state.period) state.period = periodOfDate(today());
   if (state.editing && !state.entries.some(e => e.id === state.editing.id)) state.editing = null; // 다른 기기에서 삭제됨
   refreshAll();
@@ -857,7 +1055,7 @@ createStore().then(s => {
     if (!user) { state.entries = []; state.visible = []; state.editing = null; return; }
     if (!state.period) state.period = periodOfDate(today());
     store.listen(onData);
-    go(hash.get('tab') || 'add');
+    go(hash.get('tab') && hash.get('tab') !== 'add' ? hash.get('tab') : 'home');
     if (hash.get('day')) { state.calDay = hash.get('day'); refreshAll(); }
   });
 }).catch(err => {
