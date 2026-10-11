@@ -263,7 +263,8 @@ const HELD = '참음'; // 참은 소비는 기록과 같은 곳에 이 구분으
 const FEELS = { '필수': '🧾', '만족': '😊', '후회': '😣' };
 // 후회를 고르면 한 번 더 묻는 그때 기분 (타이핑 없이 톡)
 const MOODS = [['지쳐서', '😩'], ['스트레스', '😤'], ['심심해서', '🥱'], ['들떠서', '🎉'], ['분위기상', '🤝'], ['늦은 밤', '🌙']];
-const moods = () => state.settings.moods || MOODS; // 설정에서 추가·삭제한 목록 (없으면 기본)
+// 설정에서 추가·삭제한 목록 (없으면 기본). Firestore는 배열 안에 배열을 못 담아서 {t, ic} 객체로 저장한다
+const moods = () => state.settings.moods ? state.settings.moods.map(m => Array.isArray(m) ? m : [m.t, m.ic]) : MOODS;
 const moodIcon = m => (moods().find(([t]) => t === m) || MOODS.find(([t]) => t === m) || [])[1] || '💭';
 
 function renderHome() {
@@ -650,8 +651,9 @@ function renderMoodSettings() {
   $('#s-moods').innerHTML = moods().map(([t, ic], i) => `<span class="chip sm mood-item">${ic} ${esc(t)}<button data-mooddel="${i}" aria-label="${esc(t)} 삭제">✕</button></span>`).join('');
 }
 function saveMoods(list) {
-  state.settings.moods = list; renderMoodSettings();
-  store.saveSettings({ moods: list }).catch(err => toast('설정 저장 실패: ' + errMsg(err)));
+  const objs = list.map(([t, ic]) => ({ t, ic }));
+  state.settings.moods = objs; renderMoodSettings();
+  store.saveSettings({ moods: objs }).catch(err => toast('설정 저장 실패: ' + errMsg(err)));
 }
 function addMood() {
   const raw = $('#s-mood-new').value.trim(); if (!raw) return $('#s-mood-new').focus();
@@ -674,6 +676,7 @@ const rvMinValue = () => Number($('#s-rv-min').value.replace(/[^\d]/g, '')) || 0
 function setRvMin(n) { $('#s-rv-min').value = n ? n.toLocaleString('ko-KR') : ''; }
 // 설정 '확인': 입력 중인 값(이름, 리뷰 금액)을 반영하고 닫기
 function applySettings() {
+  if ($('#s-mood-new').value.trim()) addMood(); // 칸에 쓰고 '추가' 대신 '확인'을 눌러도 들어가게
   if (rvMinValue() !== reviewCfg().min) saveReviewCfg({ min: rvMinValue() });
   const title = $('#s-title').value.trim();
   if (title !== appTitle()) $('#s-title').dispatchEvent(new Event('change'));
