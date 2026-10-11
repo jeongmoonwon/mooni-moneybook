@@ -583,5 +583,7 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 /* 설정: 기분 목록 */
 .mood-item{display:inline-flex;align-items:center;gap:4px}
 .mood-item button{border:0;background:none;color:var(--mu);font-size:11px;padding:0 0 0 2px}
+.mood-item .mood-lab{color:var(--t1);font-size:13px;padding:0}
+.mood-item[aria-pressed=true]{border-color:var(--ink);background:var(--wash)}
 
 #form-actions .btn{white-space:nowrap}

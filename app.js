@@ -647,8 +647,19 @@ function saveMood() {
 }
 
 // 설정: 후회할 때 기분 목록 추가 · 삭제 (예전 기록에 남은 기분은 그대로 보여요)
+// 기분 칩을 누르면 아래 칸에 불러와서 고치고('수정'), 다시 누르면 고치기 취소
 function renderMoodSettings() {
-  $('#s-moods').innerHTML = moods().map(([t, ic], i) => `<span class="chip sm mood-item">${ic} ${esc(t)}<button data-mooddel="${i}" aria-label="${esc(t)} 삭제">✕</button></span>`).join('');
+  const E = state.moodEdit;
+  $('#s-moods').innerHTML = moods().map(([t, ic], i) => `<span class="chip sm mood-item" aria-pressed="${E === i}">
+    <button class="mood-lab" data-moodedit="${i}" aria-label="${esc(t)} 고치기">${ic} ${esc(t)}</button><button data-mooddel="${i}" aria-label="${esc(t)} 삭제">✕</button></span>`).join('');
+  $('[data-moodadd]').textContent = E != null ? '수정' : '추가';
+  $('#s-mood-new').placeholder = E != null ? '바꿀 이름 (앞에 이모지를 쓰면 아이콘도 바뀌어요)' : '예: 😴 졸려서';
+}
+function editMood(i) {
+  if (state.moodEdit === i) { state.moodEdit = null; $('#s-mood-new').value = ''; return renderMoodSettings(); }
+  const [t, ic] = moods()[i];
+  state.moodEdit = i; $('#s-mood-new').value = `${ic} ${t}`;
+  renderMoodSettings(); $('#s-mood-new').focus();
 }
 function saveMoods(list) {
   const objs = list.map(([t, ic]) => ({ t, ic }));
@@ -658,12 +669,22 @@ function saveMoods(list) {
 function addMood() {
   const raw = $('#s-mood-new').value.trim(); if (!raw) return $('#s-mood-new').focus();
   const m = raw.match(/^(\p{Extended_Pictographic}[\uFE0F\u200D\p{Extended_Pictographic}]*)\s*(.+)$/u); // "😴 졸려서"처럼 앞에 이모지가 있으면 아이콘으로
-  const [t, ic] = m ? [m[2].trim(), m[1]] : [raw, '💭'];
-  if (moods().some(([x]) => x === t)) { toast('이미 있는 기분이에요'); return; }
+  const E = state.moodEdit, list = moods().slice();
+  const [t, ic] = m ? [m[2].trim(), m[1]] : [raw, E != null ? list[E][1] : '💭'];
+  if (list.some(([x], i) => x === t && i !== E)) { toast('이미 있는 기분이에요'); return; }
   $('#s-mood-new').value = '';
-  saveMoods([...moods(), [t, ic]]);
+  if (E == null) return saveMoods([...list, [t, ic]]);
+  const old = list[E][0];
+  list[E] = [t, ic]; state.moodEdit = null;
+  saveMoods(list);
+  if (old !== t) { // 이름을 바꾸면 예전 기록에 남은 기분 이름도 같이 바꾼다
+    const hit = state.entries.filter(e => e.mood === old);
+    hit.forEach(e => store.save({ ...e, mood: t }, e).catch(err => toast('동기화 실패: ' + errMsg(err))));
+    toast(hit.length ? `'${t}'(으)로 바꿨어요 · 예전 기록 ${hit.length}개도 함께` : `'${t}'(으)로 바꿨어요`);
+  } else toast('수정했어요');
 }
 function removeMood(i) {
+  state.moodEdit = null; $('#s-mood-new').value = '';
   const list = moods().slice(); list.splice(i, 1);
   saveMoods(list);
 }
@@ -1467,6 +1488,7 @@ function openSettings() {
   $('#s-rv-min').value = rv.min ? rv.min.toLocaleString('ko-KR') : '';
   $('#s-rv-days').innerHTML = Array.from({ length: 30 }, (_, i) => i + 1)
     .map(n => `<option value="${n}" ${n === rv.days ? 'selected' : ''}>${n}일 뒤</option>`).join('');
+  state.moodEdit = null; $('#s-mood-new').value = '';
   renderReviewCats(); renderMoodSettings();
   $('#s-import-msg').textContent = '';
   loadFont(); renderPrefs();
@@ -1592,6 +1614,7 @@ document.addEventListener('click', ev => {
   if (d.ffeel !== undefined) { state.formFeel = d.ffeel || 'none'; if (d.ffeel !== '후회') state.formMood = ''; return renderFormFeel(); }
   if (d.fmood !== undefined) { state.formMood = state.formMood === d.fmood ? '' : d.fmood; return renderFormFeel(); }
   if (d.mooddel !== undefined) return removeMood(Number(d.mooddel));
+  if (d.moodedit !== undefined) return editMood(Number(d.moodedit));
   if (d.moodadd !== undefined) return addMood();
   if (d.pref) { const [k, v] = d.pref.split('|'); return setPref(k, v); }
   if (d.cemove) { const [i, dir] = d.cemove.split('|').map(Number); return moveCat(i, dir); }
