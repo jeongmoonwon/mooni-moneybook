@@ -349,6 +349,8 @@ function badgeProgress(b, key) {
 
 // 이번 달 목록이 없으면 기본 배지 + 지난달에 못 받은 배지로 만든다 (한 번만 저장)
 function ensureMonthBadges() {
+  // 설정(배지 목록)이 아직 안 왔을 때 만들면 저장된 목록을 기본 목록으로 덮어쓰게 되니 기다린다
+  if (!state.settingsReady) return;
   const key = periodOfDate(today()), all = state.settings.badges || {};
   if (all[key] || state.badgeInit === key) return;
   state.badgeInit = key;
@@ -1651,7 +1653,7 @@ addEventListener('offline', renderSync);
 function onData(data) {
   const paydayChanged = data.settings.payday !== state.settings.payday;
   state.entries = data.entries.filter(e => e.type !== HELD); state.held = data.entries.filter(e => e.type === HELD); // 참은 소비는 합계에 안 섞이게 따로
-  state.settings = data.settings; state.pending = data.pending;
+  state.settings = data.settings; state.pending = data.pending; state.settingsReady = data.settingsReady;
   if (paydayChanged || !state.period) state.period = periodOfDate(today());
   if (state.editing && !state.entries.some(e => e.id === state.editing.id)) state.editing = null; // 다른 기기에서 삭제됨
   refreshAll();

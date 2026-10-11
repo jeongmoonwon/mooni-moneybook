@@ -64,8 +64,8 @@ async function firebaseStore(cfg) {
     listen(onData) {
       unsubs.forEach(f => f());
       const months = new Map();
-      let settings = { payday: 25 }, pending = false;
-      const emit = () => onData({ entries: [...months.values()].flat(), settings, pending });
+      let settings = { payday: 25 }, pending = false, settingsReady = false; // 설정 문서가 한 번이라도 도착했는지
+      const emit = () => onData({ entries: [...months.values()].flat(), settings, pending, settingsReady });
       unsubs = [
         F.onSnapshot(F.collection(db, 'users', uid, 'months'), { includeMetadataChanges: true }, snap => {
           snap.docChanges().forEach(ch => {
@@ -76,7 +76,7 @@ async function firebaseStore(cfg) {
           pending = snap.metadata.hasPendingWrites;
           emit();
         }),
-        F.onSnapshot(F.doc(db, 'users', uid), d => { settings = { payday: 25, ...(d.data() || {}) }; emit(); }),
+        F.onSnapshot(F.doc(db, 'users', uid), d => { settings = { payday: 25, ...(d.data() || {}) }; settingsReady = true; emit(); }),
       ];
     },
 
@@ -158,7 +158,7 @@ function demoStore() {
   let listener = () => {};
   const commit = () => {
     try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { /* 저장소 차단 */ }
-    listener({ entries: db.entries.slice(), settings: { ...db.settings }, pending: false });
+    listener({ entries: db.entries.slice(), settings: { ...db.settings }, pending: false, settingsReady: true });
     return Promise.resolve();
   };
   return {
