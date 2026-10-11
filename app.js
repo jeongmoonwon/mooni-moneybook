@@ -728,7 +728,8 @@ function renderMonth() {
     <div class="card-head">
       <h2 style="margin:0">${state.period === periodOfDate(today()) ? '이번 달 ' : ''}예산</h2>
       <div style="display:flex;align-items:center;gap:4px">
-        ${sumOf(catBudgetsOf(state.period).map) ? `<button class="chip sm bud-edit" data-budget>전체 ${compact(sumOf(catBudgetsOf(state.period).map))}원 ✎</button>` : ''}
+        ${sumOf(catBudgetsOf(state.period).map) ? `<button class="chip sm bud-edit" data-budget>전체 ${compact(sumOf(catBudgetsOf(state.period).map))}원 ✎</button>`
+          : `<button class="chip sm bud-edit bud-new" data-budget>＋ ${state.period === periodOfDate(today()) ? '이번 달 ' : ''}예산 정하기</button>`}
         <button class="icon-btn info-btn" id="info" aria-label="계산 기준 보기" aria-expanded="${state.info}">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="7.8" r=".6" fill="currentColor"/></svg>
         </button>
@@ -872,8 +873,7 @@ function catScale(b, s, avg) {
 function budTotalHtml(map) {
   const { end } = periodRange(state.period), t = today();
   const budget = sumOf(map), spent = state.budCtx.spent, rest = budget - spent;
-  if (!budget) return `<div class="bud-top"><div><p class="label">쓴 돈</p><div class="hero num">${won(spent)}</div></div></div>
-    <button class="btn ghost bud-set" data-budget>이번 달 예산 정하기</button>`;
+  if (!budget) return `<div class="bud-top"><div><p class="label">쓴 돈</p><div class="hero num">${won(spent)}</div></div></div>`;
   const note = t > end ? (rest < 0 ? `<p class="bud-note bad">예산보다 ${won(-rest)} 더 썼어요</p>` : `<p class="bud-note good">예산보다 ${won(rest)} 덜 썼어요</p>`) : '';
   return `<div class="bud-top"><div><p class="label">${rest >= 0 ? '남은 예산' : '예산 초과'}</p><div class="hero num ${rest < 0 ? 'over' : ''}">${rest < 0 ? '−' : ''}${won(Math.abs(rest))}</div></div></div>
     <div class="tb"><div class="tb-track"><i style="width:${Math.min(100, spent / budget * 100)}%" class="${rest < 0 ? 'over' : ''}"></i></div>

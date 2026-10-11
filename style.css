@@ -148,6 +148,7 @@ button.title:active{background:var(--wash)}
 .hero{font-size:30px;font-weight:800;letter-spacing:-.02em}
 /* 예산: 남은 예산 + 누적 지출 그래프 */
 .bud-edit{font-weight:700;color:var(--t-strong)}
+.bud-new{border-style:dashed;border-color:var(--ink)}
 .bud-top{display:flex;justify-content:space-between;align-items:flex-end;margin-top:10px}
 .bud-top .label{margin:0 0 2px}
 .bud-cmp{display:inline-flex;align-items:center;gap:6px;margin:10px 0 0;font-size:13px;color:var(--t2);background:var(--wash);border-radius:999px;padding:5px 12px}
