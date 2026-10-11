@@ -543,3 +543,14 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 .bm-prev .bd{margin:0;flex:none}
 .bm-prev b{font:16px var(--round),sans-serif}
 .bm-prev small{display:block;font-size:12px;color:var(--t2)}
+
+/* 한 달 탭: 돌아보기 */
+.lb-nums{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+.lb-nums div{background:var(--page);border-radius:16px;padding:8px 2px;text-align:center}
+.lb-nums b{display:block;font-size:17px;font-family:var(--round),sans-serif}
+.lb-nums small{font-size:10px;color:var(--mu)}
+.lb-nums .warn b{color:var(--bad)}
+.lb-nums .held b{color:var(--t-strong)}
+.lb-mood{margin:12px 0 0;font-size:14px;background:var(--wash);border-radius:14px;padding:9px 12px}
+.lb-fold{display:flex;justify-content:space-between;align-items:center;width:100%;margin-top:10px;padding:11px 12px;border:0;border-radius:14px;background:var(--page);font-size:14px;font-weight:700;color:var(--t1)}
+.lb-fold i{font-style:normal;font-size:12px;color:var(--t-strong);font-weight:400}

@@ -73,8 +73,7 @@
       <div class="tiles" id="save-tiles"></div>
       <div class="bars" id="save-bars" style="margin-top:14px"></div>
     </div>
-    <div class="card" id="feel-card"></div>
-    <div class="card" id="held-card"></div>
+    <div class="card" id="lookback"></div>
     </div>
   </section>
 
@@ -151,9 +150,16 @@
     <div><b>카테고리</b><p>추가 · 삭제 · 이름 바꾸기 · 순서 바꾸기</p></div>
     <button class="chip" id="open-cats">편집</button>
   </div>
-  <div class="set-row">
+  <div class="set-row stack">
     <div><b>소비 리뷰 금액</b><p>이 금액 이상인 지출만 나중에 만족도를 물어봐요</p></div>
-    <input class="input num" id="s-rv-min" inputmode="numeric" autocomplete="off" style="width:120px;text-align:right">
+    <input class="input amount num" id="s-rv-min" inputmode="numeric" placeholder="0" autocomplete="off" style="margin-top:8px">
+    <div class="quick">
+      <button class="chip sm" data-rvadd="10000">+1만</button>
+      <button class="chip sm" data-rvadd="30000">+3만</button>
+      <button class="chip sm" data-rvadd="50000">+5만</button>
+      <button class="chip sm" data-rvadd="100000">+10만</button>
+      <button class="chip sm" data-rvadd="0">지우기</button>
+    </div>
   </div>
   <div class="set-row">
     <div><b>소비 리뷰 시점</b><p>쓴 날로부터 며칠 뒤에 물어볼까요</p></div>
@@ -168,7 +174,7 @@
     <label class="chip" style="white-space:nowrap">파일 선택<input type="file" id="s-import" accept=".csv" hidden></label>
   </div>
   <p class="note" id="s-import-msg"></p>
-  <div class="actions"><button class="btn ghost" data-close>닫기</button></div>
+  <div class="actions"><button class="btn primary" data-setok>확인</button></div>
 </div></dialog>
 
 <!-- 내보내기 -->

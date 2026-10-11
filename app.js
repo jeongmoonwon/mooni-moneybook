@@ -500,15 +500,12 @@ function renderStatus() {
     : cur.held ? ['잘 참고 있어요!', `${m}월 ${day}일째 · 이번 달 ${cur.held}번 참았어요`]
     : ['차곡차곡 기록 중이에요', `${m}월 ${day}일째`];
   const list = badgesOf(key), ps = list.map(b => badgeProgress(b, key));
-  // 다음 배지: 아직 못 받은 것 중 가장 많이 찬 것
-  const nextI = ps.map((p, i) => i).filter(i => !ps[i].done && !ps[i].fail).sort((a, b) => ps[b].fill - ps[a].fill)[0];
   const goal = (state.settings.goals || {})[key] || '', rq = reviewQueue().length;
   $('#home-status').innerHTML = `<div class="card status">
     <div class="st-top"><div class="st-face">${look.face}${look.deco ? `<i>${look.deco}</i>` : ''}<span class="st-lv">Lv.${lv}</span></div>
       <div><p class="st-title">${esc(look.title)}</p><h2>${head}</h2><p class="label" style="margin:0">${sub}</p></div></div>
     <div class="st-chips"><div><b>${cur.sat != null ? cur.sat + '%' : '–'}</b><small>😊 만족</small></div><div><b>${cur.held}번</b><small>🙌 참음</small></div>
       <div><b>${ps.filter(p => p.done).length}/${list.length}</b><small>🏅 배지</small></div><div class="warn"><b>${cur.regret}번</b><small>😣 후회</small></div></div>
-    ${nextI != null ? `<div class="st-next"><span>🏅 다음 배지</span><div class="bar"><i style="width:${Math.round(ps[nextI].fill * 100)}%"></i></div><b>${esc(badgeName(list[nextI]))}</b></div>` : ''}
     <div class="st-act"><button class="st-rv" data-review ${rq ? '' : 'disabled'}>💭 리뷰하기${rq ? `<span class="st-badge">${rq}</span>` : ''}</button>
       <button class="st-hd" data-held="">🙌 참았어요</button></div>
     ${rq ? '' : '<p class="st-none">지금은 리뷰할 소비가 없어요</p>'}
@@ -630,7 +627,18 @@ function saveMood() {
 }
 
 function saveReviewCfg(patch) {
-  store.saveSettings({ review: { ...reviewCfg(), ...patch } }).catch(err => toast('설정 저장 실패: ' + errMsg(err)));
+  state.settings.review = { ...reviewCfg(), ...patch }; // 저장이 돌아오기 전에 다른 설정을 바꿔도 덮어쓰지 않게
+  store.saveSettings({ review: state.settings.review }).catch(err => toast('설정 저장 실패: ' + errMsg(err)));
+}
+const rvMinValue = () => Number($('#s-rv-min').value.replace(/[^\d]/g, '')) || 0;
+function setRvMin(n) { $('#s-rv-min').value = n ? n.toLocaleString('ko-KR') : ''; }
+// 설정 '확인': 입력 중인 값(이름, 리뷰 금액)을 반영하고 닫기
+function applySettings() {
+  if (rvMinValue() !== reviewCfg().min) saveReviewCfg({ min: rvMinValue() });
+  const title = $('#s-title').value.trim();
+  if (title !== appTitle()) $('#s-title').dispatchEvent(new Event('change'));
+  $('#settings').close();
+  toast('설정을 반영했어요');
 }
 function renderReviewCats() {
   const rc = reviewCfg().cats;
@@ -642,9 +650,8 @@ function toggleReviewCat(c) {
   const all = cats('지출'), rc = reviewCfg().cats, cur = rc || all;
   let next = c === '' ? (rc ? null : []) : cur.includes(c) ? cur.filter(x => x !== c) : [...cur, c];
   if (next && all.every(x => next.includes(x))) next = null;
-  state.settings.review = { ...reviewCfg(), cats: next }; // 화면 먼저 바꾸고 저장은 뒤에서
-  renderReviewCats();
   saveReviewCfg({ cats: next });
+  renderReviewCats();
 }
 
 /* ================= 한 달 탭 ================= */
@@ -744,34 +751,28 @@ function renderMonth() {
 
   const sv = list.filter(e => e.type === '저축' || e.type === '투자');
   $('#save-bars').innerHTML = barsHtml(sumBy(sv, e => e.type + '|' + e.category), null, null);
-  renderFeel(list.filter(e => e.type === '지출'));
-  renderHeldCard(state.held.filter(h => periodOf(h) === state.period));
+  renderLookback(list.filter(e => e.type === '지출'), state.held.filter(h => periodOf(h) === state.period));
 
 }
 
 // 소비 만족도: 리뷰한 지출을 금액 기준으로 필수·만족·후회 비율로. 후회한 소비는 큰 순서로
-function renderFeel(exp) {
+// 돌아보기: 만족 · 필수 · 후회 비율(금액 기준), 후회할 때 가장 많았던 기분, 후회한 소비와 참은 소비 목록(눌러야 펼쳐짐)
+function renderLookback(exp, held) {
   const done = exp.filter(e => FEELS[e.feel]), total = done.reduce((s, e) => s + e.amount, 0);
-  const { min, days } = reviewCfg();
-  if (!done.length) {
-    $('#feel-card').innerHTML = `<h2>소비 만족도</h2><p class="empty" style="padding:4px 0">아직 리뷰한 소비가 없어요<br>${won(min)} 이상 지출을 ${days}일 뒤 홈에서 물어봐요</p>`;
-    return;
-  }
-  const by = sumBy(done, e => e.feel), col = { '만족': 'var(--brand)', '필수': 'var(--base)', '후회': 'var(--s1)' };
-  const order = ['만족', '필수', '후회'], pct = f => Math.round((by.get(f) || 0) / total * 100);
-  const regret = done.filter(e => e.feel === '후회').sort((a, b) => b.amount - a.amount).slice(0, 3);
-  $('#feel-card').innerHTML = `<h2 style="margin-bottom:2px">소비 만족도</h2><p class="label">리뷰한 지출 ${done.length}건 · ${won(total)} 기준</p>
-    <div class="sat">${order.map(f => by.get(f) ? `<i style="flex:${by.get(f)};background:${col[f]}" title="${f} ${won(by.get(f))}"></i>` : '').join('')}</div>
-    <div class="sat-leg">${order.map(f => `<span>${FEELS[f]} ${f} <b class="num">${pct(f)}%</b></span>`).join('')}</div>
-    ${regret.length ? `<p class="label" style="margin-top:12px">후회한 소비</p><ul class="list">${regret.map(itemHtml).join('')}</ul>` : ''}`;
-}
-
-function renderHeldCard(held) {
-  const saved = held.reduce((s, h) => s + h.amount, 0);
-  $('#held-card').innerHTML = `<div class="card-head" style="margin:0 0 6px"><h2 style="margin:0">참은 소비</h2><button class="chip sm" data-held="">+ 참았어요</button></div>
-    ${held.length ? `<p class="label">${held.length}번 참았어요${saved ? ` · ${won(saved)} 아낌` : ''}</p>
-      <ul class="list">${held.slice().sort((a, b) => b.date.localeCompare(a.date)).map(heldItemHtml).join('')}</ul>`
-      : '<p class="empty" style="padding:4px 0">사려다 참은 게 있으면 기록해 보세요</p>'}`;
+  const by = sumBy(done, e => e.feel), pct = f => total ? Math.round((by.get(f) || 0) / total * 100) + '%' : '–';
+  const regret = done.filter(e => e.feel === '후회').sort((a, b) => b.amount - a.amount);
+  const moods = new Map(); for (const e of regret) if (e.mood) moods.set(e.mood, (moods.get(e.mood) || 0) + 1);
+  const topMood = [...moods].sort((a, b) => b[1] - a[1])[0], moodIc = m => (MOODS.find(([t]) => t === m) || [])[1] || '';
+  const saved = held.reduce((s, h) => s + h.amount, 0), open = state.lookOpen || {};
+  const regretItem = e => itemHtml(e).replace('</div></div>', `${e.mood ? ` <span class="cat">· ${moodIc(e.mood)} ${esc(e.mood)}</span>` : ''}${e.feelMemo ? `<div class="cat">“${esc(e.feelMemo)}”</div>` : ''}</div></div>`);
+  const fold = (k, title, list, html, empty) => `<button class="lb-fold" data-lookfold="${k}" aria-expanded="${!!open[k]}"><span>${title}</span><i>${list.length ? (open[k] ? '접기 ▴' : '펼치기 ▾') : ''}</i></button>
+    ${open[k] ? (list.length ? `<ul class="list">${list.map(html).join('')}</ul>` : `<p class="empty" style="padding:4px 0">${empty}</p>`) : ''}`;
+  $('#lookback').innerHTML = `<h2 style="margin-bottom:2px">돌아보기</h2>
+    <p class="label">${done.length ? `리뷰한 지출 ${done.length}건 · ${won(total)} 기준` : `아직 리뷰한 소비가 없어요 · ${won(reviewCfg().min)} 이상 지출을 ${reviewCfg().days}일 뒤 물어봐요`}</p>
+    <div class="lb-nums"><div><b>${pct('만족')}</b><small>😊 만족</small></div><div><b>${pct('필수')}</b><small>🧾 필수</small></div><div class="warn"><b>${pct('후회')}</b><small>😣 후회</small></div><div class="held"><b>${held.length}번</b><small>🙌 참음${saved ? ` · ${compact(saved)}` : ''}</small></div></div>
+    ${topMood ? `<p class="lb-mood">후회할 때 가장 많았던 기분 · <b>${moodIc(topMood[0])} ${esc(topMood[0])}</b> ${topMood[1]}번</p>` : ''}
+    ${fold('regret', `😣 후회한 소비 ${regret.length}개`, regret, regretItem, '후회한 소비가 없어요')}
+    ${fold('held', `🙌 참은 소비 ${held.length}개`, held.slice().sort((a, b) => b.date.localeCompare(a.date)), heldItemHtml, '사려다 참은 게 있으면 홈에서 기록해 보세요')}`;
 }
 
 // 카테고리별 예산: 달마다 정한다. 전체 예산을 정하면 모든 카테고리에 똑같이 나눠 넣고(openBudget),
@@ -1530,6 +1531,9 @@ document.addEventListener('click', ev => {
   if (d.close !== undefined) return b.closest('dialog').close();
   if (d.cetype) { state.ceType = d.cetype; state.ceDelete = null; return renderCats(); }
   if (d.cedel) return deleteCat(d.cedel);
+  if (d.rvadd !== undefined) { setRvMin(d.rvadd === '0' ? 0 : rvMinValue() + Number(d.rvadd)); return saveReviewCfg({ min: rvMinValue() }); }
+  if (d.setok !== undefined) return applySettings();
+  if (d.lookfold) { state.lookOpen = { ...state.lookOpen, [d.lookfold]: !(state.lookOpen || {})[d.lookfold] }; return renderMonth(); }
   if (d.pref) { const [k, v] = d.pref.split('|'); return setPref(k, v); }
   if (d.cemove) { const [i, dir] = d.cemove.split('|').map(Number); return moveCat(i, dir); }
   switch (b.id) {
@@ -1552,8 +1556,9 @@ document.addEventListener('click', ev => {
 });
 $('#f-date').addEventListener('change', e => { state.date = e.target.value || today(); });
 $('#h-amount').addEventListener('input', e => { const n = Number(e.target.value.replace(/[^\d]/g, '')); e.target.value = n ? n.toLocaleString('ko-KR') : ''; });
-$('#s-rv-min').addEventListener('input', e => { const n = Number(e.target.value.replace(/[^\d]/g, '')); e.target.value = n ? n.toLocaleString('ko-KR') : ''; });
-$('#s-rv-min').addEventListener('change', e => saveReviewCfg({ min: Number(e.target.value.replace(/[^\d]/g, '')) || 0 }));
+$('#s-rv-min').addEventListener('input', () => setRvMin(rvMinValue()));
+$('#s-rv-min').addEventListener('change', () => saveReviewCfg({ min: rvMinValue() }));
+$('#s-rv-min').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
 $('#s-rv-days').addEventListener('change', e => saveReviewCfg({ days: Number(e.target.value) }));
 $('#g-text').addEventListener('keydown', e => { if (e.key === 'Enter') saveGoal(); });
 $('#f-amount').addEventListener('input', () => setAmount(amountValue()));
