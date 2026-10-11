@@ -512,22 +512,54 @@ function spendPace(key) {
   return { n, k, live: t <= end, avg: kk => n ? (sums.get(kk) || 0) / n : 0 };
 }
 
-// 예산 카드: 위에는 총 예산 대비 쓴 돈(막대), 아래에는 카테고리마다 예산 대비 쓴 돈.
-// 카테고리 막대의 동그란 손잡이를 끌면 바로 예산이 바뀌고 저장된다
+// 예산 카드: 위에는 총 예산 대비 쓴 돈(막대)과 카테고리별 지출 비율(원그래프),
+// '카테고리별 예산'을 펼치면 카테고리마다 예산 대비 쓴 돈. 동그란 손잡이를 끌면 바로 예산이 바뀌고 저장된다
 function budgetHtml(exp) {
   const cb = catBudgetsOf(state.period), map = cb.map, byCat = sumBy(exp, e => e.category);
   const used = c => map[c] || byCat.get(c);
   const shown = state.budAll ? cats('지출') : cats('지출').filter(used); // 카테고리 순서 그대로 (설정 > 카테고리에서 바꿀 수 있음)
   const hidden = cats('지출').filter(c => !used(c)).length;
-  state.budCtx = { byCat, avg: cb.avg, M: budScale(map, byCat), spent: exp.reduce((s, e) => s + e.amount, 0) };
+  state.budCtx = { byCat, avg: cb.avg, spent: exp.reduce((s, e) => s + e.amount, 0) };
+  const open = state.budOpen;
   return `<div id="bud-total">${budTotalHtml(map)}</div>
-    <div class="cb-list">${shown.map(c => cbRowHtml(c, map[c] || 0)).join('')}</div>
-    <div class="cb-foot">${hidden || state.budAll ? `<button class="chip sm" data-budall>${state.budAll ? '쓰는 카테고리만 보기' : `카테고리 ${hidden}개 더 보기`}</button>` : '<span></span>'}
-      <button class="chip sm" data-budavg>최근 12개월 평균으로 맞추기</button></div>
-    <p class="cb-hint">● 손잡이를 좌우로 끌어서 카테고리 예산을 정해요</p>`;
+    ${catPieHtml(byCat)}
+    <button class="cb-toggle" data-budopen aria-expanded="${!!open}"><span>카테고리별 예산</span><i>${open ? '접기 ▴' : '펼치기 ▾'}</i></button>
+    ${open ? `<div class="cb-list">${shown.map(c => cbRowHtml(c, map[c] || 0)).join('')}</div>
+      <div class="cb-foot">${hidden || state.budAll ? `<button class="chip sm" data-budall>${state.budAll ? '쓰는 카테고리만 보기' : `카테고리 ${hidden}개 더 보기`}</button>` : '<span></span>'}
+        <button class="chip sm" data-budavg>최근 12개월 평균으로 맞추기</button></div>
+      <p class="cb-hint">● 손잡이를 좌우로 끌어서 예산을 정해요 · 막대 끝은 카테고리마다 달라요</p>` : ''}`;
 }
-function budScale(map, byCat) { // 모든 카테고리 막대가 같은 축을 쓰도록 가장 큰 값 기준
-  return Math.max(50000, ...cats('지출').map(c => Math.max(map[c] || 0, byCat.get(c) || 0))) * 1.2;
+
+// 카테고리별 지출 비율 원그래프: 큰 순서로 5개 + 나머지는 '기타'. 조각 사이 2px 틈, 범례에 이름·금액·비율을 글자로
+function catPieHtml(byCat) {
+  const rows = [...byCat].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const total = rows.reduce((s, [, v]) => s + v, 0);
+  if (!total) return '';
+  const top = rows.slice(0, 5), rest = rows.slice(5).reduce((s, [, v]) => s + v, 0);
+  const parts = top.map(([c, v], i) => ({ c, v, color: `var(--c${i + 1})` }));
+  if (rest) parts.push({ c: '기타', v: rest, color: 'var(--c-other)', etc: rows.slice(5).map(([c]) => c).join(', ') });
+  const R = 54, W = 16, C = 2 * Math.PI * R, GAP = parts.length > 1 ? 2 : 0;
+  let off = 0;
+  const arcs = parts.map(p => {
+    const len = p.v / total * C, dash = Math.max(len - GAP, 0.5);
+    const arc = `<circle r="${R}" cx="64" cy="64" fill="none" stroke="${p.color}" stroke-width="${W}" stroke-dasharray="${dash} ${C - dash}" stroke-dashoffset="${-off}">
+      <title>${esc(p.c)} ${won(p.v)} (${Math.round(p.v / total * 100)}%)${p.etc ? ' · ' + esc(p.etc) : ''}</title></circle>`;
+    off += len; return arc;
+  }).join('');
+  return `<div class="pie">
+    <svg viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="카테고리별 지출 비율">
+      <g transform="rotate(-90 64 64)">${arcs}</g>
+      <text x="64" y="60" text-anchor="middle" class="p-top">쓴 돈</text><text x="64" y="78" text-anchor="middle" class="p-val">${compact(total)}</text></svg>
+    <ul class="pie-leg">${parts.map(p => `<li${p.c === '기타' ? ` title="${esc(p.etc)}"` : ` data-jump="지출|${esc(p.c)}"`}>
+      <i style="background:${p.color}"></i><span class="n">${esc(p.c)}</span><span class="v num">${compact(p.v)}</span><b class="num">${Math.round(p.v / total * 100)}%</b></li>`).join('')}</ul>
+  </div>`;
+}
+
+// 카테고리마다 자기 눈금: 최근 12개월 평균의 2배(쓴 돈·예산이 더 크면 그만큼)를 1·2·5 단위로 올림.
+// 예산을 바꿔도 평균은 그대로라 끝점이 잘 안 바뀐다
+function catScale(b, s, avg) {
+  const v = Math.max(avg * 2, s * 1.2, b * 1.25, 50000), p = 10 ** Math.floor(Math.log10(v));
+  return [1, 2, 5, 10].map(m => m * p).find(x => x >= v);
 }
 
 function budTotalHtml(map) {
@@ -555,16 +587,18 @@ function budTotalHtml(map) {
   return `<div class="bud-top">${top}</div>${bar}${cmp}${note}`;
 }
 
-function cbRowHtml(c, b) {
-  const { byCat, M } = state.budCtx, s = byCat.get(c) || 0;
+function cbRowHtml(c, b, M) {
+  const { byCat, avg } = state.budCtx, s = byCat.get(c) || 0;
+  M = M || catScale(b, s, avg[c] || 0);
   const pct = v => `${Math.min(100, v / M * 100)}%`;
-  return `<div class="cb-row" data-cbcat="${esc(c)}">
+  return `<div class="cb-row" data-cbcat="${esc(c)}" data-scale="${M}">
     <div class="cb-head" data-jump="지출|${esc(c)}"><span class="cb-name">${esc(c)}</span><span class="cb-amt num">${compact(s)} / <b>${b ? compact(b) : '–'}</b></span></div>
     <div class="cb-track">
       <i class="cb-fill" style="width:${pct(Math.min(s, b))}"></i>
       ${s > b ? `<i class="cb-over" style="left:${pct(b)};width:${pct(s - b)}"></i>` : ''}
       <button class="cb-knob" style="left:${pct(b)}" aria-label="${esc(c)} 예산 ${won(b)}, 좌우로 끌어서 바꾸기"></button>
     </div>
+    <div class="cb-scale num"><span>0</span><span>${compact(M)}</span></div>
   </div>`;
 }
 
@@ -583,7 +617,7 @@ function budToAverage() {
 function budDragStart(ev) {
   const knob = ev.target.closest('.cb-knob'); if (!knob) return;
   const tr = knob.parentElement, row = tr.closest('.cb-row'), c = row.dataset.cbcat;
-  const map = { ...catBudgetsOf(state.period).map }, M = state.budCtx.M, step = M > 300000 ? 10000 : 5000;
+  const map = { ...catBudgetsOf(state.period).map }, M = Number(row.dataset.scale), step = M <= 100000 ? 1000 : M <= 500000 ? 5000 : 10000; // 끄는 동안 이 줄의 눈금은 고정
   ev.preventDefault();
   knob.classList.add('on');
   let moved = false;
@@ -592,7 +626,7 @@ function budDragStart(ev) {
     const v = Math.round(x / r.width * M / step) * step;
     if (v === map[c]) return;
     map[c] = v; moved = true;
-    const tmp = document.createElement('div'); tmp.innerHTML = cbRowHtml(c, v);
+    const tmp = document.createElement('div'); tmp.innerHTML = cbRowHtml(c, v, M);
     row.querySelector('.cb-head').replaceWith(tmp.querySelector('.cb-head'));
     for (const el of [...tr.children]) if (el !== knob) el.remove(); // 손잡이는 그대로 두고 막대만 새로
     for (const el of [...tmp.querySelector('.cb-track').children]) if (!el.classList.contains('cb-knob')) tr.insertBefore(el, knob);
@@ -1081,7 +1115,7 @@ $('#trend-chart').addEventListener('click', ev => {
   renderTrend();
 });
 document.addEventListener('click', ev => {
-  const b = ev.target.closest('button, .item, .bar-row, .cb-head'); if (!b) return;
+  const b = ev.target.closest('button, .item, .bar-row, .cb-head, .pie-leg li[data-jump]'); if (!b) return;
   const d = b.dataset;
   if (d.view) { if (b.closest('dialog')) b.closest('dialog').close(); return go(d.view); }
   if (d.type) { state.type = d.type; state.category = cats(d.type)[0]; return renderForm(); }
@@ -1095,6 +1129,7 @@ document.addEventListener('click', ev => {
   if (d.shift) { state.date = addDays($('#f-date').value || today(), Number(d.shift)); return renderForm(); }
   if (d.pickmonth !== undefined) return openMonthPicker();
   if (d.budavg !== undefined) return budToAverage();
+  if (d.budopen !== undefined) { state.budOpen = !state.budOpen; return renderMonth(); }
   if (d.budall !== undefined) { state.budAll = !state.budAll; return renderMonth(); }
   if (d.goal !== undefined) return openGoal();
   if (d.goalok !== undefined) return saveGoal();
