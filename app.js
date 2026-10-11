@@ -653,10 +653,12 @@ function renderMoodSettings() {
   $('#s-moods').innerHTML = moods().map(([t, ic], i) => `<span class="chip sm mood-item" aria-pressed="${E === i}">
     <button class="mood-lab" data-moodedit="${i}" aria-label="${esc(t)} 고치기">${ic} ${esc(t)}</button><button data-mooddel="${i}" aria-label="${esc(t)} 삭제">✕</button></span>`).join('');
   $('[data-moodadd]').textContent = E != null ? '수정' : '추가';
+  $('[data-moodcancel]').hidden = E == null;
   $('#s-mood-new').placeholder = E != null ? '바꿀 이름 (앞에 이모지를 쓰면 아이콘도 바뀌어요)' : '예: 😴 졸려서';
 }
+function cancelMoodEdit() { state.moodEdit = null; $('#s-mood-new').value = ''; renderMoodSettings(); }
 function editMood(i) {
-  if (state.moodEdit === i) { state.moodEdit = null; $('#s-mood-new').value = ''; return renderMoodSettings(); }
+  if (state.moodEdit === i) return cancelMoodEdit();
   const [t, ic] = moods()[i];
   state.moodEdit = i; $('#s-mood-new').value = `${ic} ${t}`;
   renderMoodSettings(); $('#s-mood-new').focus();
@@ -697,7 +699,10 @@ const rvMinValue = () => Number($('#s-rv-min').value.replace(/[^\d]/g, '')) || 0
 function setRvMin(n) { $('#s-rv-min').value = n ? n.toLocaleString('ko-KR') : ''; }
 // 설정 '확인': 입력 중인 값(이름, 리뷰 금액)을 반영하고 닫기
 function applySettings() {
-  if ($('#s-mood-new').value.trim()) addMood(); // 칸에 쓰고 '추가' 대신 '확인'을 눌러도 들어가게
+  // 칸에 쓰고 '추가' 대신 '확인'을 눌러도 들어가게. 고치던 중이면 바꾼 게 있을 때만 반영하고, 그대로면 그냥 닫기
+  const E = state.moodEdit, v = $('#s-mood-new').value.trim();
+  if (E != null) { const [t, ic] = moods()[E]; if (v && v !== `${ic} ${t}` && v !== t) addMood(); else cancelMoodEdit(); }
+  else if (v) addMood();
   if (rvMinValue() !== reviewCfg().min) saveReviewCfg({ min: rvMinValue() });
   const title = $('#s-title').value.trim();
   if (title !== appTitle()) $('#s-title').dispatchEvent(new Event('change'));
@@ -1615,6 +1620,7 @@ document.addEventListener('click', ev => {
   if (d.fmood !== undefined) { state.formMood = state.formMood === d.fmood ? '' : d.fmood; return renderFormFeel(); }
   if (d.mooddel !== undefined) return removeMood(Number(d.mooddel));
   if (d.moodedit !== undefined) return editMood(Number(d.moodedit));
+  if (d.moodcancel !== undefined) return cancelMoodEdit();
   if (d.moodadd !== undefined) return addMood();
   if (d.pref) { const [k, v] = d.pref.split('|'); return setPref(k, v); }
   if (d.cemove) { const [i, dir] = d.cemove.split('|').map(Number); return moveCat(i, dir); }
