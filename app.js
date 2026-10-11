@@ -37,6 +37,26 @@ function shiftPeriod(key, n) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 const md = s => { const d = parse(s); return `${d.getMonth() + 1}.${d.getDate()}`; };
+
+// 공휴일 (대체공휴일·선거일·임시공휴일 포함). 설날·추석·부처님오신날은 음력이라 해마다 직접 추가해야 해요.
+const HOLIDAYS = {
+  '2024-01-01': '신정', '2024-02-09': '설날 연휴', '2024-02-10': '설날', '2024-02-11': '설날 연휴', '2024-02-12': '대체공휴일',
+  '2024-03-01': '삼일절', '2024-04-10': '국회의원 선거', '2024-05-05': '어린이날', '2024-05-06': '대체공휴일', '2024-05-15': '부처님오신날',
+  '2024-06-06': '현충일', '2024-08-15': '광복절', '2024-09-16': '추석 연휴', '2024-09-17': '추석', '2024-09-18': '추석 연휴',
+  '2024-10-01': '국군의 날 (임시공휴일)', '2024-10-03': '개천절', '2024-10-09': '한글날', '2024-12-25': '성탄절',
+  '2025-01-01': '신정', '2025-01-27': '임시공휴일', '2025-01-28': '설날 연휴', '2025-01-29': '설날', '2025-01-30': '설날 연휴',
+  '2025-03-01': '삼일절', '2025-03-03': '대체공휴일', '2025-05-05': '어린이날 · 부처님오신날', '2025-05-06': '대체공휴일',
+  '2025-06-03': '대통령 선거', '2025-06-06': '현충일', '2025-08-15': '광복절', '2025-10-03': '개천절',
+  '2025-10-05': '추석 연휴', '2025-10-06': '추석', '2025-10-07': '추석 연휴', '2025-10-08': '대체공휴일', '2025-10-09': '한글날', '2025-12-25': '성탄절',
+  '2026-01-01': '신정', '2026-02-16': '설날 연휴', '2026-02-17': '설날', '2026-02-18': '설날 연휴', '2026-03-01': '삼일절', '2026-03-02': '대체공휴일',
+  '2026-05-05': '어린이날', '2026-05-24': '부처님오신날', '2026-05-25': '대체공휴일', '2026-06-03': '지방선거', '2026-06-06': '현충일',
+  '2026-08-15': '광복절', '2026-08-17': '대체공휴일', '2026-09-24': '추석 연휴', '2026-09-25': '추석', '2026-09-26': '추석 연휴',
+  '2026-10-03': '개천절', '2026-10-05': '대체공휴일', '2026-10-09': '한글날', '2026-12-25': '성탄절',
+  '2027-01-01': '신정', '2027-02-05': '설날 연휴', '2027-02-06': '설날', '2027-02-07': '설날 연휴', '2027-02-08': '대체공휴일',
+  '2027-03-01': '삼일절', '2027-05-05': '어린이날', '2027-05-13': '부처님오신날', '2027-06-06': '현충일', '2027-08-15': '광복절', '2027-08-16': '대체공휴일',
+  '2027-09-14': '추석 연휴', '2027-09-15': '추석', '2027-09-16': '추석 연휴', '2027-10-03': '개천절', '2027-10-04': '대체공휴일',
+  '2027-10-09': '한글날', '2027-10-11': '대체공휴일', '2027-12-25': '성탄절', '2027-12-27': '대체공휴일',
+};
 const WD = ['일', '월', '화', '수', '목', '금', '토'];
 
 /* ================= 표시 ================= */
@@ -56,8 +76,8 @@ function toast(msg) {
 let store = null;
 const state = {
   user: null, entries: [], held: [], settings: { payday: 25 }, pending: false,
-  view: 'home', homeDay: today(), type: '지출', category: '식비', date: today(), editing: null, heldEditing: null, rv: [], rvI: 0,
-  period: null, calDay: null, trendType: '지출', trendCat: '', fltType: '', fltCat: '', q: '', visible: [],
+  view: 'home', type: '지출', category: '식비', date: today(), editing: null, heldEditing: null, rv: [], rvI: 0,
+  period: null, calDay: today(), trendType: '지출', trendCat: '', fltType: '', fltCat: '', q: '', visible: [],
   info: false, ceType: '지출', ceDelete: null,
 };
 function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
@@ -129,7 +149,7 @@ function resetForm() {
 
 // 새 기록: 홈에서 고른 날짜(또는 달력에서 고른 날짜)로 기록하기 창을 연다
 function openEntry(day) {
-  state.date = day || state.homeDay;
+  state.date = day || state.calDay || today();
   resetForm();
   $('#entry-sheet').showModal(); document.activeElement.blur();
 }
@@ -152,7 +172,7 @@ function submit() {
     type: state.type, category: state.category,
     detail: $('#f-detail').value.trim(), amount, memo: $('#f-memo').value.trim(), feel: prev && prev.feel,
   };
-  state.date = state.homeDay = e.date;
+  state.date = state.calDay = e.date;
   resetForm();
   $('#entry-sheet').close();
   store.save(e, prev).catch(err => toast('동기화 실패: ' + errMsg(err)));
@@ -178,19 +198,6 @@ function renderHome() {
     ? `<button class="goal" data-goal><span class="e">🎯</span><span class="g-main"><small>${m}월 목표</small><b>${esc(goal)}</b></span><span class="pen">✎</span></button>`
     : `<button class="goal empty" data-goal><span class="e">🎯</span><span class="g-main"><b>${m}월 소비 목표를 정해 보세요</b><small>앱을 켤 때마다 여기에 보여요</small></span></button>`;
 
-  // 이번 달 예산 한 줄 (누르면 한 달 탭)
-  const { end } = periodRange(key);
-  const spent = state.entries.filter(e => e.type === '지출' && periodOf(e) === key).reduce((s, e) => s + e.amount, 0);
-  const budget = budgetOf(key).v, rest = budget - spent;
-  const left = Math.round((parse(end) - parse(today())) / 864e5) + 1;
-  $('#home-budget').innerHTML = budget
-    ? `<button class="sumline" data-view="month"><span><span class="label">${rest < 0 ? '예산 초과' : '남은 예산'}</span>
-        <b class="num ${rest < 0 ? 'over' : ''}">${rest < 0 ? '−' : ''}${won(Math.abs(rest))}</b>
-        <span class="minibar"><i style="width:${Math.min(100, spent / budget * 100)}%"></i></span></span>
-        <span class="r"><span class="label">하루에</span><b class="num">${won(Math.max(rest, 0) / left)}</b></span></button>`
-    : `<button class="sumline" data-budget="${key}"><span><span class="label">이번 달 쓴 돈</span><b class="num">${won(spent)}</b></span>
-        <span class="r"><span class="label">예산을 정하면 남은 돈을 알려줘요</span><b class="link">예산 정하기 ›</b></span></button>`;
-
   const n = reviewQueue().length;
   $('#home-review').innerHTML = n ? `<button class="review-card" data-review><span class="e">💭</span>
     <span><b>리뷰할 소비 ${n}개</b><small>${reviewCfg().days}일 전에 쓴 돈, 지금 돌아보니 어때요?</small></span><span class="go">›</span></button>` : '';
@@ -201,21 +208,8 @@ function renderHome() {
       : '<b>사려다 참은 게 있나요?</b><small>참은 것도 기록해 두면 뿌듯해요</small>'}</span>
     <button class="chip sm" data-held="">+ 참았어요</button></div>`;
 
-  // 고른 날이 들어 있는 주 (일~토)
-  const t = today(), sun = addDays(state.homeDay, -parse(state.homeDay).getDay());
-  const ex = sumBy(state.entries.filter(e => e.type === '지출'), e => e.date);
-  $('#week-title').textContent = sun === addDays(t, -parse(t).getDay()) ? '이번 주' : `${md(sun).replace('.', '월 ')}일 주`;
-  $('#home-week').innerHTML = Array.from({ length: 7 }, (_, i) => {
-    const s = addDays(sun, i), d = parse(s);
-    return `<button data-homeday="${s}" aria-pressed="${s === state.homeDay}" class="${s === t ? 'today' : ''}">
-      <small>${WD[i]}</small><b>${d.getDate()}</b><i class="${ex.get(s) ? 'on' : ''}"></i></button>`;
-  }).join('');
-
-  const d = parse(state.homeDay), list = state.entries.filter(e => e.date === state.homeDay), hl = state.held.filter(h => h.date === state.homeDay);
-  $('#day-title').textContent = `${state.homeDay === t ? '오늘 · ' : ''}${d.getMonth() + 1}월 ${d.getDate()}일 (${WD[d.getDay()]})`;
-  $('#day-list').innerHTML = list.length || hl.length ? list.map(itemHtml).join('') + hl.map(heldItemHtml).join('') : '<li class="empty">아직 기록이 없어요</li>';
-  const dayEx = ex.get(state.homeDay) || 0;
-  $('#day-sum').textContent = dayEx ? `지출 합계 −${won(dayEx)}` : '';
+  renderPeriodNav();
+  renderCalendar();
 }
 
 /* ================= 이번 달 목표 ================= */
@@ -234,7 +228,7 @@ function saveGoal() {
 function openHeld(id) {
   const h = state.heldEditing = state.held.find(x => x.id === id) || null;
   $('#h-title').textContent = h ? '🙌 참은 소비 수정' : '🙌 참은 소비';
-  $('#h-date').value = h ? h.date : state.homeDay;
+  $('#h-date').value = h ? h.date : state.calDay || today();
   $('#h-what').value = h ? h.detail : ''; $('#h-how').value = h ? h.memo : '';
   $('#h-amount').value = h && h.amount ? h.amount.toLocaleString('ko-KR') : '';
   $('#h-actions').innerHTML = (h ? '<button class="btn danger" data-helddel style="width:auto;padding:14px 18px">삭제</button>' : '')
@@ -409,7 +403,6 @@ function renderMonth() {
   renderFeel(list.filter(e => e.type === '지출'));
   renderHeldCard(state.held.filter(h => periodOf(h) === state.period));
 
-  renderCalendar();
 }
 
 // 소비 만족도: 리뷰한 지출을 금액 기준으로 필수·만족·후회 비율로. 후회한 소비는 큰 순서로
@@ -550,8 +543,9 @@ function renderCalendar() {
   for (let s = start; s <= end; s = addDays(s, 1)) {
     const d = parse(s), v = ex.get(s);
     const lab = d.getDate() === 1 || s === start ? `${d.getMonth() + 1}/${d.getDate()}` : d.getDate();
-    html += `<button data-day="${s}" aria-pressed="${s === state.calDay}" class="${d.getDay() === 0 ? 'sun' : ''}"
-      aria-label="${d.getMonth() + 1}월 ${d.getDate()}일${v ? ' 지출 ' + won(v) : ''}">
+    const hol = HOLIDAYS[s];
+    html += `<button data-day="${s}" aria-pressed="${s === state.calDay}" class="${d.getDay() === 0 || hol ? 'sun' : ''}"
+      aria-label="${d.getMonth() + 1}월 ${d.getDate()}일${hol ? ' ' + hol : ''}${v ? ' 지출 ' + won(v) : ''}"${hol ? ` title="${hol}"` : ''}>
       <span class="d ${s === t ? 'today' : ''}">${lab}</span>
       ${v ? `<span class="lv lv${level(v)}" title="지출 ${won(v)}"></span>` : '<span class="lv"></span>'}
       ${inc.get(s) ? `<span class="in num">+${compact(inc.get(s))}</span>` : ''}</button>`;
@@ -561,12 +555,12 @@ function renderCalendar() {
     <span>많음</span><span class="mu">· 평소 하루 ${won(ref)} 기준 (${past.length ? '최근 1년' : '이번 달'} 중간값)</span>` : '';
 
   if (!state.calDay) { $('#cal-list').innerHTML = ''; return; }
-  const dayList = state.entries.filter(e => e.date === state.calDay);
+  const dayList = state.entries.filter(e => e.date === state.calDay), heldList = state.held.filter(h => h.date === state.calDay);
   const dd = parse(state.calDay), dayEx = ex.get(state.calDay) || 0;
-  $('#cal-list').innerHTML = `<div class="day-head"><span>${dd.getMonth() + 1}월 ${dd.getDate()}일 (${WD[dd.getDay()]})</span>
+  $('#cal-list').innerHTML = `<div class="day-head"><span>${dd.getMonth() + 1}월 ${dd.getDate()}일 (${WD[dd.getDay()]})${HOLIDAYS[state.calDay] ? ` · <span class="hol-name">${HOLIDAYS[state.calDay]}</span>` : ''}</span>
     <span class="num">${dayEx ? '지출 ' + won(dayEx) : ''}</span></div>
     <button class="btn ghost add-day" data-addday="${state.calDay}">＋ 이 날 내역 추가</button>
-    <ul class="list">${dayList.length ? dayList.map(itemHtml).join('') : '<li class="empty">이 날은 기록이 없어요</li>'}</ul>`;
+    <ul class="list">${dayList.length || heldList.length ? dayList.map(itemHtml).join('') + heldList.map(heldItemHtml).join('') : '<li class="empty">이 날은 기록이 없어요</li>'}</ul>`;
 }
 
 // 달력에서 고른 날짜로 기록하기 창을 연다
@@ -955,8 +949,6 @@ document.addEventListener('click', ev => {
   if (d.shift) { state.date = addDays($('#f-date').value || today(), Number(d.shift)); return renderForm(); }
   if (d.pickmonth !== undefined) return openMonthPicker();
   if (d.budget !== undefined) return openBudget(d.budget || state.period);
-  if (d.homeday) { state.homeDay = d.homeday; return renderHome(); }
-  if (d.hweek) { state.homeDay = addDays(state.homeDay, Number(d.hweek)); return renderHome(); }
   if (d.goal !== undefined) return openGoal();
   if (d.goalok !== undefined) return saveGoal();
   if (d.review !== undefined) return openReview();

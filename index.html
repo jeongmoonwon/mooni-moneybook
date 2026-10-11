@@ -42,20 +42,13 @@
   <!-- 홈 -->
   <section class="view on" id="view-home">
     <div id="home-goal"></div>
-    <div id="home-budget"></div>
     <div id="home-review"></div>
     <div id="home-held"></div>
     <div class="card">
-      <div class="card-head" style="margin:0 0 10px">
-        <h2 style="margin:0" id="week-title">이번 주</h2>
-        <div style="display:flex;gap:4px"><button class="step sm" data-hweek="-7" aria-label="이전 주">‹</button><button class="step sm" data-hweek="7" aria-label="다음 주">›</button></div>
-      </div>
-      <div class="week" id="home-week"></div>
-    </div>
-    <div class="card">
-      <h2 id="day-title">오늘</h2>
-      <ul class="list" id="day-list"></ul>
-      <p class="day-sum num" id="day-sum"></p>
+      <div class="period cal-nav" data-period-nav></div>
+      <div class="cal" id="cal"></div>
+      <div class="cal-legend" id="cal-legend"></div>
+      <div id="cal-list"></div>
     </div>
     <button class="fab" id="open-entry" aria-label="기록 추가">
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -73,11 +66,6 @@
     </div>
     <div class="card" id="feel-card"></div>
     <div class="card" id="held-card"></div>
-    <div class="card">
-      <h2>달력</h2>
-      <div class="cal" id="cal"></div>
-      <div class="cal-legend" id="cal-legend"></div>
-      <div id="cal-list"></div>
     </div>
     <div class="card"><h2>지출 카테고리</h2><div class="bars" id="cat-bars"></div></div>
   </section>
