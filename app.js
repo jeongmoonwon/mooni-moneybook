@@ -340,7 +340,7 @@ function badgeProgress(b, key) {
   if (b.kind === 'custom') {
     const u = b.unit || 'count', auto = (b.words || []).length > 0;
     // 지정한 단어가 상세내역 · 메모 · 카테고리에 들어간 지출은 자동으로 센다. 단어가 없으면 홈에서 눌러 직접 기록
-    const v = auto ? val(exp.filter(e => matchWords(e, b.words)), u) : b.count || 0;
+    const v = auto ? val(exp.filter(e => matchWords(e, b.words) && !(b.exclude || []).includes(e.id)), u) : b.count || 0;
     if (b.dir === 'down') return keepUnder(v, b.n, u); // 적게 할수록 좋은 목표: 넘지 않고 한 달을 버티면 받음
     return v >= b.n ? { fill: 1, label: '받았어요', done: true } : { fill: v / b.n, label: `${nfmt(v, u)} / ${nfmt(b.n, u)}${auto ? '' : ' · 눌러서 기록'}`, fail: past };
   }
@@ -399,7 +399,7 @@ function renderHomeBadges() {
   $('#home-badges').innerHTML = `<div class="card">
     <div class="card-head" style="margin:0"><div><h2 style="margin:0">${m}월 배지</h2><p class="label" style="margin:2px 0 0">도전 중 ${list.length - got}개 · 받은 배지 ${got}개</p></div>
       <button class="chip sm bud-edit" data-badgeedit>✎ 목록 편집하기</button></div>
-    ${list.length ? `<div class="bgrid">${list.map((b, i) => `<div${b.kind === 'custom' && !(b.words || []).length ? ` class="bcheck" data-bcheck="${i}"` : ''}>${badgeHtml(b, ps[i])}<small>${esc(badgeName(b))}</small><em>${esc(ps[i].label)}</em></div>`).join('')}</div>`
+    ${list.length ? `<div class="bgrid">${list.map((b, i) => `<div${b.kind === 'custom' ? ` class="bcheck" ${(b.words || []).length ? 'data-bmatch' : 'data-bcheck'}="${i}"` : ''}>${badgeHtml(b, ps[i])}<small>${esc(badgeName(b))}</small><em>${esc(ps[i].label)}</em></div>`).join('')}</div>`
       : '<p class="empty">목록 편집하기에서 배지를 추가해 보세요</p>'}
     <button class="link-btn" data-badgeall style="margin-top:12px">지금까지 받은 배지 · ${earnedBadges().length}개 ›</button></div>`;
 }
@@ -560,6 +560,26 @@ function badgeCheckStep(dir) {
   b.count = Math.max(0, (b.count || 0) + dir * step);
   saveBadges(key, list); renderBadgeCheck(); renderHome();
   if (dir > 0) toast(b.dir === 'down' ? (b.count > b.n ? '이번 달 목표를 넘었어요 😢' : '기록했어요') : b.count >= b.n ? `🎉 '${badgeName(b)}' 배지를 받았어요!` : '기록했어요 👍');
+}
+
+// 자동으로 세는 배지: 누르면 이번 달에 잡힌 기록 목록. 해당 없는 건 '빼기'로 제외하고, 뺀 건 아래에서 다시 넣을 수 있음
+function openBadgeMatch(i) { state.bmatch = i; renderBadgeMatch(); $('#badge-match').showModal(); document.activeElement.blur(); }
+function renderBadgeMatch() {
+  const key = periodOfDate(today()), b = badgesOf(key)[state.bmatch]; if (!b) return;
+  const ex = b.exclude || [], hits = periodEntries(key).filter(e => e.type === '지출' && matchWords(e, b.words)).sort((a, c) => c.date.localeCompare(a.date));
+  const on = hits.filter(e => !ex.includes(e.id)), off = hits.filter(e => ex.includes(e.id));
+  const row = (e, out) => `<li class="bm-hit${out ? ' out' : ''}"><div class="main"><div class="cat">${md(e.date)} · ${esc(e.category)}</div><div class="det">${esc(e.detail || '—')}</div></div>
+    <div class="amt num">${won(e.amount)}</div><button class="chip sm" data-bmx="${esc(e.id)}">${out ? '다시 넣기' : '빼기'}</button></li>`;
+  $('#bm-hit-body').innerHTML = `<div class="bc">${badgeHtml(b, badgeProgress(b, key))}<h3>${esc(badgeName(b))}</h3><p>${esc(badgeProgress(b, key).label)}</p></div>
+    <p class="note" style="margin:10px 0 4px">'${b.words.map(esc).join("', '")}'(으)로 잡힌 이번 달 기록이에요. 해당 없는 건 빼 주세요</p>
+    <ul class="list">${on.length ? on.map(e => row(e)).join('') : '<li class="empty">아직 잡힌 기록이 없어요</li>'}</ul>
+    ${off.length ? `<p class="label" style="margin-top:12px">뺀 기록 ${off.length}개</p><ul class="list">${off.map(e => row(e, true)).join('')}</ul>` : ''}`;
+}
+function toggleExclude(id) {
+  const key = periodOfDate(today()), list = badgesOf(key).map(x => ({ ...x })), b = list[state.bmatch]; if (!b) return;
+  const ex = new Set(b.exclude || []); ex.has(id) ? ex.delete(id) : ex.add(id);
+  b.exclude = [...ex]; if (!b.exclude.length) delete b.exclude;
+  saveBadges(key, list); renderBadgeMatch(); renderHome();
 }
 
 function openEarned() {
@@ -1639,7 +1659,7 @@ $('#trend-chart').addEventListener('click', ev => {
   renderTrend();
 });
 document.addEventListener('click', ev => {
-  const b = ev.target.closest('button, .item, .bar-row, .cb-head, .pie [data-jump], .pie [data-pieetc], [data-bcheck]'); if (!b) return;
+  const b = ev.target.closest('button, .item, .bar-row, .cb-head, .pie [data-jump], .pie [data-pieetc], [data-bcheck], [data-bmatch]'); if (!b) return;
   const d = b.dataset;
   if (d.view) { if (b.closest('dialog')) b.closest('dialog').close(); return go(d.view); }
   if (d.type) { state.type = d.type; state.category = cats(d.type)[0]; return renderForm(); }
@@ -1672,6 +1692,8 @@ document.addEventListener('click', ev => {
   if (d.bmlv) { state.maker.n = Number(d.bmlv); return renderBadgeMaker(); }
   if (d.bmcolor) { state.maker.color = d.bmcolor; return renderBadgeMaker(); }
   if (d.bcheck !== undefined) return openBadgeCheck(Number(d.bcheck));
+  if (d.bmatch !== undefined) return openBadgeMatch(Number(d.bmatch));
+  if (d.bmx) return toggleExclude(d.bmx);
   if (d.bmwordadd !== undefined) return addMakerWord($('#bm-word-in').value);
   if (d.bmwordsug !== undefined) return addMakerWord(d.bmwordsug);
   if (d.bmworddel !== undefined) { state.maker.words.splice(Number(d.bmworddel), 1); return renderBadgeMaker(); }

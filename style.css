@@ -619,3 +619,11 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 /* 기록하기 창 카테고리 버튼은 조금 작게 */
 #cat-chips .chip{font-size:13px;padding:5px 11px}
 .word-item{background:var(--wash)!important;border-color:var(--ink)!important;color:var(--t1);font-weight:700}
+.bm-hit{display:flex;align-items:center;gap:10px;padding:10px 2px;border-top:1px solid var(--grid)}
+.bm-hit:first-child{border-top:0}
+.bm-hit .main{flex:1;min-width:0}
+.bm-hit .cat{font-size:12px;color:var(--mu)}
+.bm-hit .det{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bm-hit .amt{font-weight:600;white-space:nowrap}
+.bm-hit.out{opacity:.5}
+.bm-hit.out .det{text-decoration:line-through}
