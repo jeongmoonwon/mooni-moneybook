@@ -38,25 +38,25 @@ function shiftPeriod(key, n) {
 }
 const md = s => { const d = parse(s); return `${d.getMonth() + 1}.${d.getDate()}`; };
 
-// 공휴일 (대체공휴일·선거일·임시공휴일 포함). 설날·추석·부처님오신날은 음력이라 해마다 직접 추가해야 해요.
-const HOLIDAYS = {
-  '2024-01-01': '신정', '2024-02-09': '설날 연휴', '2024-02-10': '설날', '2024-02-11': '설날 연휴', '2024-02-12': '대체공휴일',
-  '2024-03-01': '삼일절', '2024-04-10': '국회의원 선거', '2024-05-05': '어린이날', '2024-05-06': '대체공휴일', '2024-05-15': '부처님오신날',
-  '2024-06-06': '현충일', '2024-08-15': '광복절', '2024-09-16': '추석 연휴', '2024-09-17': '추석', '2024-09-18': '추석 연휴',
-  '2024-10-01': '국군의 날 (임시공휴일)', '2024-10-03': '개천절', '2024-10-09': '한글날', '2024-12-25': '성탄절',
-  '2025-01-01': '신정', '2025-01-27': '임시공휴일', '2025-01-28': '설날 연휴', '2025-01-29': '설날', '2025-01-30': '설날 연휴',
-  '2025-03-01': '삼일절', '2025-03-03': '대체공휴일', '2025-05-05': '어린이날 · 부처님오신날', '2025-05-06': '대체공휴일',
-  '2025-06-03': '대통령 선거', '2025-06-06': '현충일', '2025-08-15': '광복절', '2025-10-03': '개천절',
-  '2025-10-05': '추석 연휴', '2025-10-06': '추석', '2025-10-07': '추석 연휴', '2025-10-08': '대체공휴일', '2025-10-09': '한글날', '2025-12-25': '성탄절',
-  '2026-01-01': '신정', '2026-02-16': '설날 연휴', '2026-02-17': '설날', '2026-02-18': '설날 연휴', '2026-03-01': '삼일절', '2026-03-02': '대체공휴일',
-  '2026-05-05': '어린이날', '2026-05-24': '부처님오신날', '2026-05-25': '대체공휴일', '2026-06-03': '지방선거', '2026-06-06': '현충일',
-  '2026-08-15': '광복절', '2026-08-17': '대체공휴일', '2026-09-24': '추석 연휴', '2026-09-25': '추석', '2026-09-26': '추석 연휴',
-  '2026-10-03': '개천절', '2026-10-05': '대체공휴일', '2026-10-09': '한글날', '2026-12-25': '성탄절',
-  '2027-01-01': '신정', '2027-02-05': '설날 연휴', '2027-02-06': '설날', '2027-02-07': '설날 연휴', '2027-02-08': '대체공휴일',
-  '2027-03-01': '삼일절', '2027-05-05': '어린이날', '2027-05-13': '부처님오신날', '2027-06-06': '현충일', '2027-08-15': '광복절', '2027-08-16': '대체공휴일',
-  '2027-09-14': '추석 연휴', '2027-09-15': '추석', '2027-09-16': '추석 연휴', '2027-10-03': '개천절', '2027-10-04': '대체공휴일',
-  '2027-10-09': '한글날', '2027-10-11': '대체공휴일', '2027-12-25': '성탄절', '2027-12-27': '대체공휴일',
-};
+// 공휴일: 우주항공청 월력요항을 정리한 공개 데이터(holidays-kr)를 해마다 받아와 이 기기에 저장해 둔다.
+// 대체공휴일·임시공휴일·선거일까지 들어 있고, 새 해 데이터가 올라오면 앱을 고치지 않아도 자동으로 반영된다.
+const HOLIDAY_URL = y => `https://cdn.jsdelivr.net/gh/hyunbinseo/holidays-kr@main/public/${y}.json`;
+const holidays = {}; // { 'YYYY': { 'YYYY-MM-DD': '이름' } | null(아직 없음) }
+function loadHolidays(y) {
+  if (y in holidays) return;
+  let cached = null;
+  try { cached = JSON.parse(localStorage.getItem('holidays-' + y)); } catch { /* 저장소를 못 쓰면 매번 받아옴 */ }
+  holidays[y] = cached ? cached.days : null;
+  if (cached && Date.now() - cached.at < 7 * 864e5) return; // 일주일에 한 번만 새로 확인
+  fetch(HOLIDAY_URL(y)).then(r => r.ok ? r.json() : null).then(json => {
+    if (!json) return; // 아직 발표 전인 해
+    const days = Object.fromEntries(Object.entries(json).map(([d, names]) => [d, names.join(' · ')]));
+    holidays[y] = days;
+    try { localStorage.setItem('holidays-' + y, JSON.stringify({ at: Date.now(), days })); } catch { /* 무시 */ }
+    if (state.view === 'home') renderCalendar();
+  }).catch(() => { /* 오프라인이면 저장해 둔 것(또는 일요일만)으로 표시 */ });
+}
+function holidayName(s) { const y = s.slice(0, 4); loadHolidays(y); return (holidays[y] || {})[s] || ''; }
 const WD = ['일', '월', '화', '수', '목', '금', '토'];
 
 /* ================= 표시 ================= */
@@ -543,9 +543,9 @@ function renderCalendar() {
   for (let s = start; s <= end; s = addDays(s, 1)) {
     const d = parse(s), v = ex.get(s);
     const lab = d.getDate() === 1 || s === start ? `${d.getMonth() + 1}/${d.getDate()}` : d.getDate();
-    const hol = HOLIDAYS[s];
+    const hol = holidayName(s);
     html += `<button data-day="${s}" aria-pressed="${s === state.calDay}" class="${d.getDay() === 0 || hol ? 'sun' : ''}"
-      aria-label="${d.getMonth() + 1}월 ${d.getDate()}일${hol ? ' ' + hol : ''}${v ? ' 지출 ' + won(v) : ''}"${hol ? ` title="${hol}"` : ''}>
+      aria-label="${d.getMonth() + 1}월 ${d.getDate()}일${hol ? ' ' + esc(hol) : ''}${v ? ' 지출 ' + won(v) : ''}"${hol ? ` title="${esc(hol)}"` : ''}>
       <span class="d ${s === t ? 'today' : ''}">${lab}</span>
       ${v ? `<span class="lv lv${level(v)}" title="지출 ${won(v)}"></span>` : '<span class="lv"></span>'}
       ${inc.get(s) ? `<span class="in num">+${compact(inc.get(s))}</span>` : ''}</button>`;
@@ -557,7 +557,7 @@ function renderCalendar() {
   if (!state.calDay) { $('#cal-list').innerHTML = ''; return; }
   const dayList = state.entries.filter(e => e.date === state.calDay), heldList = state.held.filter(h => h.date === state.calDay);
   const dd = parse(state.calDay), dayEx = ex.get(state.calDay) || 0;
-  $('#cal-list').innerHTML = `<div class="day-head"><span>${dd.getMonth() + 1}월 ${dd.getDate()}일 (${WD[dd.getDay()]})${HOLIDAYS[state.calDay] ? ` · <span class="hol-name">${HOLIDAYS[state.calDay]}</span>` : ''}</span>
+  $('#cal-list').innerHTML = `<div class="day-head"><span>${dd.getMonth() + 1}월 ${dd.getDate()}일 (${WD[dd.getDay()]})${holidayName(state.calDay) ? ` · <span class="hol-name">${esc(holidayName(state.calDay))}</span>` : ''}</span>
     <span class="num">${dayEx ? '지출 ' + won(dayEx) : ''}</span></div>
     <button class="btn ghost add-day" data-addday="${state.calDay}">＋ 이 날 내역 추가</button>
     <ul class="list">${dayList.length || heldList.length ? dayList.map(itemHtml).join('') + heldList.map(heldItemHtml).join('') : '<li class="empty">이 날은 기록이 없어요</li>'}</ul>`;
