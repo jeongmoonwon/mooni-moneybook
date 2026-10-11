@@ -298,6 +298,11 @@ body.demo .demo-banner{display:block}
 .td-cmp{font-size:13px;color:var(--t2);margin:2px 0 12px}
 #view-trend{--series:var(--s1);--peak:var(--up)}
 .seg.seg-2{grid-template-columns:repeat(2,1fr)}
+.seg.seg-3{grid-template-columns:repeat(3,1fr)}
+#trend-range .seg button{padding:7px 0;font-size:13px}
+.range-pick{display:flex;align-items:center;gap:8px;margin-top:8px}
+.range-pick select{flex:1;min-width:0;padding:9px 10px}
+.range-pick span{color:var(--mu)}
 .add-day{margin:6px 0 4px;padding:11px}
 
 /* 홈 */
