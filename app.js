@@ -652,7 +652,7 @@ function reviewQueue() {
     && e.amount >= min && (!rc || rc.includes(e.category))).sort((a, b) => a.date.localeCompare(b.date));
 }
 function openReview() {
-  state.rv = reviewQueue(); state.rvI = 0; state.rvLater = 0;
+  state.rv = reviewQueue(); state.rvI = 0; state.rvLater = 0; state.rvSel = null;
   renderReview(); $('#review').showModal(); document.activeElement.blur(); // 첫 버튼에 포커스 테두리가 생기지 않게
 }
 function renderReview() {
@@ -664,38 +664,42 @@ function renderReview() {
       <div class="actions"><button class="btn ghost" data-close>닫기</button><button class="btn primary" data-view="month">만족도 보기</button></div></div>`;
     return;
   }
+  // 고르기만 하고 '확인'을 눌러야 저장하고 다음으로. 후회를 고르면 그 아래에 그때 기분 · 한 줄 메모가 펼쳐짐
+  const sel = state.rvSel || (state.rvSel = { feel: '', mood: '', memo: '', open: false });
   const d = parse(e.date), ago = Math.round((parse(today()) - d) / 864e5);
   $('#rv-body').innerHTML = `<div class="rv-prog"><span>소비 리뷰 · ${state.rvI + 1} / ${state.rv.length}</span><button class="icon-btn" data-close aria-label="리뷰 그만하기">✕</button></div>
     <div class="rv-card"><p class="rv-when">${d.getMonth() + 1}월 ${d.getDate()}일 (${WD[d.getDay()]}) · ${ago}일 전</p>
       <h3>${esc(e.detail || e.category)}</h3><span class="rv-cat">지출 · ${esc(e.category)}</span>
       <div class="rv-amt num">${won(e.amount)}</div>
       <p class="rv-q">지금 돌아보니 어때요?</p>
-      <div class="rv-choices">${Object.entries(FEELS).map(([f, ic]) => `<button data-feel="${f}"><span>${ic}</span>${f}</button>`).join('')}</div></div>
-    <div class="actions"><button class="btn ghost" data-rvlater>이건 나중에</button><button class="btn ghost" data-feel="skip">이건 안 물어보기</button></div>`;
+      <div class="rv-choices">${Object.entries(FEELS).map(([f, ic]) => `<button data-feel="${f}" aria-pressed="${sel.feel === f}"><span>${ic}</span>${f}</button>`).join('')}</div>
+      ${sel.feel === '후회' ? `<div class="rv-mood"><p class="rv-q" style="margin:14px 0 8px">그때 기분이 어땠어요? <small>(선택)</small></p>
+        <div class="mood-chips">${moods().map(([t, ic]) => `<button class="chip" data-mood="${esc(t)}" aria-pressed="${sel.mood === t}">${ic} ${esc(t)}</button>`).join('')}</div>
+        ${sel.open ? `<textarea class="input mood-memo" id="rv-memo" rows="2" maxlength="80" placeholder="다음엔 어떻게 해 볼까요? (선택)">${esc(sel.memo)}</textarea>`
+          : '<button class="link-btn" data-moodmemo>✎ 한 줄 남기기 (선택)</button>'}</div>` : ''}</div>
+    <div class="actions"><button class="btn primary" data-moodok ${sel.feel ? '' : 'disabled'}>확인</button></div>
+    <div class="actions rv-sub"><button class="btn ghost" data-rvlater>이건 나중에</button><button class="btn ghost" data-feel="skip">이건 안 물어보기</button></div>`;
+  if (sel.open && state.rvMemoFocus) { $('#rv-memo').focus(); state.rvMemoFocus = false; }
 }
 function answerReview(feel) {
   const e = state.rv[state.rvI]; if (!e) return;
-  if (feel === '후회') { state.rvMood = { mood: '', memo: '', open: false }; return renderMoodStep(e); }
-  store.save({ ...e, feel }, e).catch(err => toast('동기화 실패: ' + errMsg(err)));
-  state.rvI++; renderReview();
+  if (feel === 'skip') { // 안 물어보기는 바로 저장하고 다음으로
+    store.save({ ...e, feel }, e).catch(err => toast('동기화 실패: ' + errMsg(err)));
+    state.rvI++; state.rvSel = null; return renderReview();
+  }
+  const sel = state.rvSel; keepMemo();
+  sel.feel = feel; if (feel !== '후회') { sel.mood = ''; }
+  renderReview();
 }
-// 후회 다음 단계: 그때 기분 하나 고르기 (안 골라도 됨) + 한 줄 메모는 눌렀을 때만
-function renderMoodStep(e) {
-  const m = state.rvMood;
-  $('#rv-body').innerHTML = `<div class="rv-prog"><span>소비 리뷰 · ${state.rvI + 1} / ${state.rv.length}</span><button class="icon-btn" data-close aria-label="리뷰 그만하기">✕</button></div>
-    <div class="rv-card"><p class="rv-when">😣 ${esc(e.detail || e.category)} · ${won(e.amount)}</p>
-      <p class="rv-q" style="margin-top:10px">그때 기분이 어땠어요?</p>
-      <div class="mood-chips">${moods().map(([t, ic]) => `<button class="chip" data-mood="${t}" aria-pressed="${m.mood === t}">${ic} ${t}</button>`).join('')}</div>
-      ${m.open ? `<textarea class="input mood-memo" id="rv-memo" rows="2" maxlength="80" placeholder="다음엔 어떻게 해 볼까요? (선택)">${esc(m.memo)}</textarea>`
-        : '<button class="link-btn" data-moodmemo>✎ 한 줄 남기기 (선택)</button>'}</div>
-    <div class="actions"><button class="btn primary" data-moodok>다음</button></div>`;
-  if (m.open) $('#rv-memo').focus();
-}
+const keepMemo = () => { if ($('#rv-memo') && state.rvSel) state.rvSel.memo = $('#rv-memo').value; };
+// '확인': 고른 결과 저장 후 다음으로
 function saveMood() {
-  const e = state.rv[state.rvI], m = state.rvMood; if (!e) return;
-  if ($('#rv-memo')) m.memo = $('#rv-memo').value.trim();
-  store.save({ ...e, feel: '후회', mood: m.mood, feelMemo: m.memo }, e).catch(err => toast('동기화 실패: ' + errMsg(err)));
-  state.rvI++; renderReview();
+  const e = state.rv[state.rvI], sel = state.rvSel; if (!e || !sel || !sel.feel) return;
+  keepMemo();
+  const r = { ...e, feel: sel.feel }; delete r.mood; delete r.feelMemo;
+  if (sel.feel === '후회') { if (sel.mood) r.mood = sel.mood; if (sel.memo.trim()) r.feelMemo = sel.memo.trim(); }
+  store.save(r, e).catch(err => toast('동기화 실패: ' + errMsg(err)));
+  state.rvI++; state.rvSel = null; renderReview();
 }
 
 // 설정: 후회할 때 기분 목록 추가 · 삭제 (예전 기록에 남은 기분은 그대로 보여요)
@@ -1643,10 +1647,10 @@ document.addEventListener('click', ev => {
   if (d.goalok !== undefined) return saveGoal();
   if (d.review !== undefined) return openReview();
   if (d.feel) return answerReview(d.feel);
-  if (d.mood) { state.rvMood.mood = state.rvMood.mood === d.mood ? '' : d.mood; if ($('#rv-memo')) state.rvMood.memo = $('#rv-memo').value; return renderMoodStep(state.rv[state.rvI]); }
-  if (d.moodmemo !== undefined) { state.rvMood.open = true; return renderMoodStep(state.rv[state.rvI]); }
+  if (d.mood) { keepMemo(); state.rvSel.mood = state.rvSel.mood === d.mood ? '' : d.mood; return renderReview(); }
+  if (d.moodmemo !== undefined) { state.rvSel.open = true; state.rvMemoFocus = true; return renderReview(); }
   if (d.moodok !== undefined) return saveMood();
-  if (d.rvlater !== undefined) { state.rvI++; state.rvLater++; return renderReview(); } // 이 항목만 건너뛰고 다음으로 (저장 안 함 → 다음에 다시 나옴)
+  if (d.rvlater !== undefined) { state.rvI++; state.rvLater++; state.rvSel = null; return renderReview(); } // 이 항목만 건너뛰고 다음으로 (저장 안 함 → 다음에 다시 나옴)
   if (d.held !== undefined) return openHeld(d.held);
   if (d.heldok !== undefined) return saveHeld();
   if (d.hcat !== undefined) { state.heldCat = state.heldCat === d.hcat ? '' : d.hcat; return renderHeldCats(); }

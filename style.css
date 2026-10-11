@@ -608,3 +608,10 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 .bm-dir button b{display:block;font-size:13px}
 .bm-dir button small{font-size:11px;color:var(--mu)}
 .bm-dir button[aria-pressed=true]{border-color:var(--ink);background:var(--wash)}
+
+/* 리뷰: 고른 것 표시, 확인 버튼 */
+.rv-choices button[aria-pressed=true]{background:var(--ink);color:var(--on-ink)}
+.rv-q small{font-weight:400;color:var(--mu);font-size:12px}
+.rv-sub{margin-top:8px}
+.rv-sub .btn{padding:11px;font-size:13px}
+#rv-body .btn.primary:disabled{opacity:.45;box-shadow:none;cursor:default}
