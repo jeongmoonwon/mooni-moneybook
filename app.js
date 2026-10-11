@@ -374,6 +374,7 @@ function renderMonth() {
   const notes = [
     '예산은 지출만 계산해요. 저축·투자는 아래 카드에 따로 보여줘요.',
     '예산을 정하지 않은 달은 직전에 정한 달의 예산을 그대로 써요.',
+    '지출 ▲▼는 최근 12개월 각 달의 같은 기간(첫날~오늘과 같은 일째) 지출 평균과 비교해요. 지난 달을 볼 때는 달 전체끼리 비교해요.',
     state.base.n ? `▲▼ 최근 1년(${state.base.n}개월) 월평균 대비예요. <span class="up">▲ 늘어남</span> · <span class="down">▼ 줄어듦</span>` : '▲▼ 비교할 최근 1년 기록이 아직 없어요.',
     '수입·지출 모두 실제 날짜가 이 기간 안에 있는 기록만 계산해요.',
   ];
@@ -438,6 +439,19 @@ function budgetOf(key) {
   return { v: prev ? b[prev] : 0, own: false };
 }
 
+// 지출 비교: 보고 있는 달의 첫날부터 k일째까지 쓴 돈을, 직전 12개월 각 달의 같은 기간(첫날~k일째) 지출 평균과 비교.
+// 달 전체 평균과 비교하면 달 초에는 늘 적게 나오니, 같은 날짜까지끼리 비교한다. 기록이 하나도 없는 달은 평균에서 뺀다.
+function spendPace(key, k) {
+  const sums = [];
+  for (let i = 1; i <= 12; i++) {
+    const p = shiftPeriod(key, -i), list = periodEntries(p);
+    if (!list.length) continue;
+    const { start, end } = periodRange(p), until = [addDays(start, k - 1), end].sort()[0];
+    sums.push(list.filter(e => e.type === '지출' && e.date <= until).reduce((s, e) => s + e.amount, 0));
+  }
+  return sums.length ? { avg: sums.reduce((a, b) => a + b, 0) / sums.length, n: sums.length } : null;
+}
+
 // 예산 카드: 남은 예산 + 날짜별 누적 지출 선 vs 예산을 고르게 쓸 때의 선. 이번 달이면 이 속도로 월말에 얼마가 될지 예상
 function budgetHtml(exp) {
   const { start, end } = periodRange(state.period), t = today();
@@ -481,7 +495,16 @@ function budgetHtml(exp) {
     : `<p class="bud-note good">예산보다 ${won(rest)} 덜 썼어요</p>`;
   else if (!budget) note = '<p class="bud-note">예산을 정하면 남은 돈과 하루에 쓸 수 있는 돈을 알려줘요</p>';
 
-  return `<div class="bud-top">${top}</div>
+  let cmp = '';
+  const pace = now >= 0 ? spendPace(state.period, live ? now + 1 : days) : null;
+  if (pace && pace.avg) {
+    const p = Math.round((spent - pace.avg) / pace.avg * 100);
+    cmp = `<p class="bud-cmp">${live ? `지금까지(${now + 1}일째)` : '이 달'} 쓴 돈 <b class="num">${won(spent)}</b> ·
+      최근 ${pace.n}개월 ${live ? '같은 기간 ' : ''}평균 ${won(pace.avg)}보다
+      <b class="chg num ${p > 0 ? 'up' : p < 0 ? 'down' : ''}">${p > 0 ? `▲${p}%` : p < 0 ? `▼${-p}%` : '–0%'}</b></p>`;
+  }
+
+  return `<div class="bud-top">${top}</div>${cmp}
     <svg class="bud-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="날짜별 누적 지출">${g}</svg>
     <div class="bud-legend"><span><i class="k-cum"></i>쓴 돈(누적)</span>${budget ? '<span><i class="k-pace"></i>고르게 쓸 때</span><span><i class="k-bud"></i>예산</span>' : ''}</div>
     ${note}`;
