@@ -618,3 +618,4 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 
 /* 기록하기 창 카테고리 버튼은 조금 작게 */
 #cat-chips .chip{font-size:13px;padding:5px 11px}
+.word-item{background:var(--wash)!important;border-color:var(--ink)!important;color:var(--t1);font-weight:700}

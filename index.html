@@ -304,9 +304,14 @@
   <div class="field"><p class="label">무엇을</p><div class="chips" id="bm-kind"></div></div>
   <div class="field"><p class="label" id="bm-title-l">이름 (선택)</p><input class="input" id="bm-title" maxlength="20" autocomplete="off"></div>
   <div class="bm-dir" id="bm-dir" hidden></div>
-  <div class="field" id="bm-custom-f" hidden><p class="label">아이콘 (선택)</p>
-    <input class="input bm-icon-in" id="bm-icon-in" maxlength="4" autocomplete="off" placeholder="예: 🚌">
-    <p class="note" style="margin-top:6px">직접 적은 배지는 앱이 셀 수 없어서, 홈에서 배지를 눌러 직접 기록해요</p></div>
+  <div class="field" id="bm-custom-f" hidden>
+    <p class="label">자동으로 셀 내역 (여러 개 가능)</p>
+    <div class="chips" id="bm-words"></div>
+    <div style="display:flex;gap:8px;margin-top:8px"><input class="input" id="bm-word-in" maxlength="20" autocomplete="off" placeholder="예: 카페, 스벅, 편의점"><button class="chip" data-bmwordadd style="white-space:nowrap">추가</button></div>
+    <div class="chips" id="bm-wsug" style="margin-top:8px"></div>
+    <p class="note" style="margin-top:6px">지출의 상세내역 · 메모 · 카테고리에 이 단어가 들어가면 자동으로 세요</p>
+    <p class="label" style="margin-top:14px">아이콘 (선택)</p>
+    <input class="input bm-icon-in" id="bm-icon-in" maxlength="4" autocomplete="off" placeholder="예: ☕"></div>
   <div class="field" id="bm-cat-f"><p class="label">어떤 걸 (선택)</p><div class="chips" id="bm-cat"></div></div>
   <div class="field" id="bm-n-f"><p class="label">얼마나</p>
     <div class="chips" id="bm-unit" style="margin-bottom:8px"></div>
