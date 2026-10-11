@@ -10,7 +10,7 @@
   --up:#E5534B; --down:#4C8BE0; --income:#36A66B;
   --lv1:#f29488; --lv2:#e8665a; --lv3:#d03b30; --lv4:#9e231b;
   --cell1:#fde4e1; --cell2:#f9c3bc; --cell3:#f29488; --cell4:#e8665a; --ex-ink:#7a1f2b; /* 달력 칸: 지출 많을수록 진하게 */
-  --c1:#F59576; --c2:#78A9EC; --c3:#D9A32F; --c4:#A893EE; --c5:#5DBB91; --c-other:#D8CBC4; /* 원그래프 카테고리 색 (배지 색 계열, 순서 고정 · 색약 구분 검사 통과) */
+  --c1:#FFB59A; --c2:#9CC8FF; --c3:#FFDB6E; --c4:#C8B6FF; --c5:#8ED9B4; --c-other:#E2C2A3; /* 원그래프 카테고리 색 = 배지 색과 같은 파스텔 (순서 고정) */
   --kfont:"Poor Story"; --round:"Jua";
 }
 @media (prefers-color-scheme: dark){
@@ -25,7 +25,7 @@
     --up:#F07068; --down:#6FA2F0; --income:#4CC08A;
     --lv1:#9a3028; --lv2:#c2463b; --lv3:#e6766b; --lv4:#f6b3aa;
     --cell1:#3e2420; --cell2:#5a2a24; --cell3:#7d332b; --cell4:#a13c31; --ex-ink:#ffb8b0;
-    --c1:#D07050; --c2:#5F94DA; --c3:#B98C22; --c4:#9580E0; --c5:#3FA77B; --c-other:#5f4d45;
+    --c1:#FFB59A; --c2:#9CC8FF; --c3:#FFDB6E; --c4:#C8B6FF; --c5:#8ED9B4; --c-other:#E2C2A3;
   }
 }
 /* 설정에서 '항상 어둡게'를 고른 경우 */
@@ -40,7 +40,7 @@
     --up:#F07068; --down:#6FA2F0; --income:#4CC08A;
     --lv1:#9a3028; --lv2:#c2463b; --lv3:#e6766b; --lv4:#f6b3aa;
     --cell1:#3e2420; --cell2:#5a2a24; --cell3:#7d332b; --cell4:#a13c31; --ex-ink:#ffb8b0;
-    --c1:#D07050; --c2:#5F94DA; --c3:#B98C22; --c4:#9580E0; --c5:#3FA77B; --c-other:#5f4d45;
+    --c1:#FFB59A; --c2:#9CC8FF; --c3:#FFDB6E; --c4:#C8B6FF; --c5:#8ED9B4; --c-other:#E2C2A3;
   }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--page);color:var(--t1)}
