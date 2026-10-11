@@ -716,14 +716,14 @@ function renderCalendar() {
     const d = parse(s), v = ex.get(s);
     const lab = d.getDate() === 1 || s === start ? `${d.getMonth() + 1}/${d.getDate()}` : d.getDate();
     const hol = holidayName(s);
-    html += `<button data-day="${s}" aria-pressed="${s === state.calDay}" class="${d.getDay() === 0 || hol ? 'sun' : d.getDay() === 6 ? 'saturday' : ''}"
+    html += `<button data-day="${s}" aria-pressed="${s === state.calDay}" class="${d.getDay() === 0 || hol ? 'sun' : d.getDay() === 6 ? 'saturday' : ''}${v ? ' cl' + level(v) : ''}"
       aria-label="${d.getMonth() + 1}월 ${d.getDate()}일${hol ? ' ' + esc(hol) : ''}${v ? ' 지출 ' + won(v) : ''}"${hol ? ` title="${esc(hol)}"` : ''}>
       <span class="d ${s === t ? 'today' : ''}">${lab}</span>
-      ${v ? `<span class="lv lv${level(v)}" title="지출 ${won(v)}"></span>` : '<span class="lv"></span>'}
-      ${inc.get(s) ? `<span class="in num">+${compact(inc.get(s))}</span>` : ''}</button>`;
+      ${inc.get(s) ? `<span class="in num">+${compact(inc.get(s))}</span>` : ''}
+      ${v ? `<span class="ex num">−${compact(v)}</span>` : ''}</button>`;
   }
   $('#cal').innerHTML = html;
-  $('#cal-legend').innerHTML = ref ? `<span>지출 적음</span>${[1, 2, 3, 4].map(i => `<span class="lv lv${i}" title="${LEVELS[i - 1][1]}"></span>`).join('')}
+  $('#cal-legend').innerHTML = ref ? `<span>지출 적음</span>${[1, 2, 3, 4].map(i => `<span class="cl-key cl${i}" title="${LEVELS[i - 1][1]}"></span>`).join('')}
     <span>많음</span><span class="mu">· 평소 하루 ${won(ref)} 기준 (${past.length ? '최근 1년' : '이번 달'} 중간값)</span>` : '';
 
   if (!state.calDay) { $('#cal-list').innerHTML = ''; return; }
