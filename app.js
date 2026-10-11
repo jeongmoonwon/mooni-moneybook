@@ -268,8 +268,7 @@ function renderCalSum() {
   const { start, end } = periodRange(state.period), t = today(), live = t >= start && t <= end;
   const list = state.entries.filter(e => e.date >= start && e.date <= (live ? t : end));
   const sum = type => list.filter(e => e.type === type).reduce((s, e) => s + e.amount, 0);
-  $('#cal-sum').innerHTML = `<span class="cs-lab">${live ? '오늘까지' : '이 달'}</span>
-    <span>수입 <b class="num in">+${won(sum('수입'))}</b></span><span>지출 <b class="num ex">−${won(sum('지출'))}</b></span>`;
+  $('#cal-sum').innerHTML = `<p>수입 <b class="num in">+${won(sum('수입'))}</b></p><p>지출 <b class="num ex">−${won(sum('지출'))}</b></p>`;
 }
 
 /* ================= 이번 달 목표 ================= */
