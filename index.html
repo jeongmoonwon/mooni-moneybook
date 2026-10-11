@@ -303,6 +303,7 @@
   <p class="note" style="margin:0">한 달 안에 이루는 도전이에요</p>
   <div class="field"><p class="label">무엇을</p><div class="chips" id="bm-kind"></div></div>
   <div class="field"><p class="label" id="bm-title-l">이름 (선택)</p><input class="input" id="bm-title" maxlength="20" autocomplete="off"></div>
+  <div class="bm-dir" id="bm-dir" hidden></div>
   <div class="field" id="bm-custom-f" hidden><p class="label">아이콘 (선택)</p>
     <input class="input bm-icon-in" id="bm-icon-in" maxlength="4" autocomplete="off" placeholder="예: 🚌">
     <p class="note" style="margin-top:6px">직접 적은 배지는 앱이 셀 수 없어서, 홈에서 배지를 눌러 직접 기록해요</p></div>
@@ -320,6 +321,7 @@
 <!-- 직접 적은 배지 체크 -->
 <dialog id="badge-check"><div class="body">
   <div class="bc" id="bc-body"></div>
+  <p class="note" id="bc-hint" style="text-align:center;margin:4px 0 0"></p>
   <div class="field" id="bc-amt-f" hidden>
     <input class="input amount num" id="bc-amt" inputmode="numeric" placeholder="0" autocomplete="off">
     <div class="quick"><button class="chip sm" data-bcadd="1000">+1천</button><button class="chip sm" data-bcadd="5000">+5천</button><button class="chip sm" data-bcadd="10000">+1만</button><button class="chip sm" data-bcadd="50000">+5만</button></div>

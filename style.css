@@ -603,3 +603,8 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 .bc p{margin:0;color:var(--mu)}
 .bm-custom{border-style:dashed!important;border-color:var(--ink)}
 .bm-icon-in{width:120px;font-size:18px;text-align:center}
+.bm-dir{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.bm-dir button{border:1.5px solid var(--border);background:var(--card);border-radius:14px;padding:10px 8px;text-align:left;color:var(--t1)}
+.bm-dir button b{display:block;font-size:13px}
+.bm-dir button small{font-size:11px;color:var(--mu)}
+.bm-dir button[aria-pressed=true]{border-color:var(--ink);background:var(--wash)}

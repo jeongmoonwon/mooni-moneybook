@@ -311,7 +311,7 @@ function badgeName(b) {
   if (b.title) return b.title;
   const c = b.cat ? b.cat + ' ' : '';
   return { held: `${c}${nfmt(b.n, b.unit)} 참기`, reduce: `${c || '지출 '}${nfmt(b.n, b.unit)} 이하`, sat: `만족 ${b.n}% 넘기기`,
-    regret: `후회 ${b.n}번 이하`, custom: `나만의 목표 ${nfmt(b.n, b.unit)}`, daily: `${b.n}일 기록하기`, budget: '예산 안에서 쓰기' }[b.kind];
+    regret: `후회 ${b.n}번 이하`, custom: `나만의 목표 ${nfmt(b.n, b.unit)} ${b.dir === 'down' ? '이하' : '이상'}`, daily: `${b.n}일 기록하기`, budget: '예산 안에서 쓰기' }[b.kind];
 }
 const badgeIcon = b => b.icon || (b.cat && CAT_ICON[b.cat]) || BADGE_KINDS[b.kind].icon;
 const badgesOf = key => ((state.settings.badges || {})[key] || []).filter(b => BADGE_KINDS[b.kind]); // 없어진 종류(예전 '리뷰 다 하기')는 건너뜀
@@ -329,6 +329,7 @@ function badgeProgress(b, key) {
     : past ? { fill: 1, label: '받았어요', done: true } : { fill: elapsed, label: `${nfmt(n - used, unit)} 남음` };
   if (b.kind === 'custom') {
     const v = b.count || 0, u = b.unit || 'count';
+    if (b.dir === 'down') return keepUnder(v, b.n, u); // 적게 할수록 좋은 목표: 넘지 않고 한 달을 버티면 받음
     return v >= b.n ? { fill: 1, label: '받았어요', done: true } : { fill: v / b.n, label: `${nfmt(v, u)} / ${nfmt(b.n, u)} · 눌러서 기록`, fail: past };
   }
   if (b.kind === 'held') {
@@ -478,7 +479,10 @@ function renderBadgeMaker() {
   }
   $('#bm-color').innerHTML = BADGE_COLORS.map(c => `<button class="bm-sw" data-bmcolor="${c}" style="background:${c}" aria-pressed="${badgeColor(m) === c}" aria-label="색 ${c}"></button>`).join('');
   $('#bm-title-l').textContent = custom ? '무엇을 할까요?' : '이름 (선택)';
-  $('#bm-title').placeholder = custom ? '예: 편의점 안 가기, 택시 대신 버스, 아낀 돈 모으기' : badgeName({ ...m, title: '' });
+  $('#bm-title').placeholder = custom ? (m.dir === 'down' ? '예: 편의점 가기, 택시 타기, 배달 시키기' : '예: 택시 대신 버스, 도시락 싸기, 아낀 돈 모으기') : badgeName({ ...m, title: '' });
+  $('#bm-dir').hidden = !custom;
+  if (custom) $('#bm-dir').innerHTML = [['up', '⬆️ 많이 할수록 좋아요', '목표만큼 채우면 받아요'], ['down', '⬇️ 적게 할수록 좋아요', '한 달 동안 넘지 않으면 받아요']]
+    .map(([v, t, s]) => `<button data-bmdir="${v}" aria-pressed="${(m.dir || 'up') === v}"><b>${t}</b><small>${s}</small></button>`).join('');
   if (document.activeElement !== $('#bm-title')) $('#bm-title').value = m.title || '';
   $('#bm-prev').innerHTML = `${badgeHtml(m, { fill: 1, done: true })}<span><b>${esc(badgeName(m))}</b><small>이번 달 안에 이루면 받아요</small></span>`;
 }
@@ -493,6 +497,7 @@ function saveBadgeMaker() {
   b.title = $('#bm-title').value.trim();
   if (b.kind === 'custom' && !b.title) { toast('무엇을 할지 적어 주세요'); return $('#bm-title').focus(); }
   if (b.kind !== 'custom' || !b.icon) delete b.icon; // Firestore는 undefined 값을 못 받음
+  if (b.kind !== 'custom') delete b.dir; else b.dir = b.dir || 'up';
   if (BADGE_KINDS[b.kind].units.length && !b.n && b.kind !== 'reduce' && b.kind !== 'regret') { toast('목표 숫자를 넣어 주세요'); return $('#bm-n-in').focus(); }
   if (idx != null) state.badgeDraft[idx] = { ...state.badgeDraft[idx], ...b };
   else state.badgeDraft.push({ ...b, id: newId(), origin: 'mine' });
@@ -509,7 +514,8 @@ function renderBadgeCheck() {
   $('#bc-body').innerHTML = `${badgeHtml(b, badgeProgress(b, key))}<h3>${esc(badgeName(b))}</h3>
     <p class="num">${nfmt(b.count || 0, u)} / ${nfmt(b.n, u)}</p>`;
   $('#bc-amt-f').hidden = u !== 'amount';
-  $('#bc-plus').textContent = u === 'amount' ? '＋ 더하기' : '＋ 했어요!';
+  $('#bc-plus').textContent = u === 'amount' ? '＋ 더하기' : b.dir === 'down' ? '＋ 했어요 (1번)' : '＋ 했어요!';
+  $('#bc-hint').textContent = b.dir === 'down' ? `${nfmt(b.n, u)}을 넘지 않으면 받아요` : `${nfmt(b.n, u)}을 채우면 받아요`;
   $('#bc-minus').textContent = u === 'amount' ? '− 빼기' : '− 하나 빼기';
 }
 function badgeCheckStep(dir) {
@@ -522,7 +528,7 @@ function badgeCheckStep(dir) {
   }
   b.count = Math.max(0, (b.count || 0) + dir * step);
   saveBadges(key, list); renderBadgeCheck(); renderHome();
-  if (dir > 0) toast(b.count >= b.n ? `🎉 '${badgeName(b)}' 배지를 받았어요!` : '기록했어요 👍');
+  if (dir > 0) toast(b.dir === 'down' ? (b.count > b.n ? '이번 달 목표를 넘었어요 😢' : '기록했어요') : b.count >= b.n ? `🎉 '${badgeName(b)}' 배지를 받았어요!` : '기록했어요 👍');
 }
 
 function openEarned() {
@@ -1630,6 +1636,7 @@ document.addEventListener('click', ev => {
   if (d.bmlv) { state.maker.n = Number(d.bmlv); return renderBadgeMaker(); }
   if (d.bmcolor) { state.maker.color = d.bmcolor; return renderBadgeMaker(); }
   if (d.bcheck !== undefined) return openBadgeCheck(Number(d.bcheck));
+  if (d.bmdir) { state.maker.dir = d.bmdir; return renderBadgeMaker(); }
   if (d.bcstep) return badgeCheckStep(Number(d.bcstep));
   if (d.bcadd) { const el = $('#bc-amt'), n = (Number(el.value.replace(/[^\d]/g, '')) || 0) + Number(d.bcadd); el.value = n.toLocaleString('ko-KR'); return; }
   if (d.bmsave !== undefined) return saveBadgeMaker();
