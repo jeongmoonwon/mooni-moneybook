@@ -77,9 +77,29 @@ let store = null;
 const state = {
   user: null, entries: [], held: [], settings: { payday: 25 }, pending: false,
   view: 'home', type: '지출', category: '식비', date: today(), editing: null, heldEditing: null, rv: [], rvI: 0,
-  period: null, calDay: today(), trendType: '지출', trendCat: '', trendRange: 'year', trendFrom: '', trendTo: '', trendRangeOpen: false, fltType: '', fltCat: '', q: '', visible: [],
+  period: null, calDay: today(), calMode: savedCalMode(), calWeek: null, trendType: '지출', trendCat: '', trendRange: 'year', trendFrom: '', trendTo: '', trendRangeOpen: false, fltType: '', fltCat: '', q: '', visible: [],
   info: false, ceType: '지출', ceDelete: null, calc: '', split: null,
 };
+// 홈 달력을 한 달로 볼지 일주일로 볼지. 이 기기에 기억해 둔다
+function savedCalMode() { try { return localStorage.getItem('calMode') === 'week' ? 'week' : 'month'; } catch { return 'month'; } }
+const weekStart = s => addDays(s, -parse(s).getDay()); // 그 날이 들어 있는 주의 일요일
+function setCalMode(mode) {
+  if (mode === state.calMode) return;
+  state.calMode = mode;
+  try { localStorage.setItem('calMode', mode); } catch { /* 기억 못 해도 동작에는 문제 없음 */ }
+  if (mode === 'week') {
+    const { start, end } = periodRange(state.period), t = today();
+    state.calWeek = weekStart(state.calDay || (t >= start && t <= end ? t : start));
+  } else state.period = periodOfDate(state.calDay || state.calWeek);
+  renderHome();
+}
+function renderWeekNav() {
+  const s = state.calWeek, e = addDays(s, 6);
+  $('#home-cal-nav').innerHTML = `<button class="step" data-wshift="-7" aria-label="이전 주">‹</button>
+    <div class="title"><b>${md(s)} ~ ${md(e)}</b><span>${s === weekStart(today()) ? '이번 주' : `${s.slice(0, 4)}년`}</span></div>
+    <button class="step" data-wshift="7" aria-label="다음 주">›</button>`;
+}
+
 function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
 // 앱 맨 위 제목만 사용자가 바꿀 수 있다. 브라우저 탭·홈 화면·내보내기 파일 이름은 항상 'mooni의 가계부'.
@@ -259,6 +279,8 @@ function renderHome() {
     <button class="chip sm" data-held="">+ 참았어요</button></div>`;
 
   renderPeriodNav();
+  $('#cal-mode').innerHTML = [['month', '월'], ['week', '주']].map(([v, t]) => `<button data-calmode="${v}" aria-pressed="${v === state.calMode}">${t}</button>`).join('');
+  if (state.calMode === 'week') { if (!state.calWeek) state.calWeek = weekStart(state.calDay || today()); renderWeekNav(); }
   renderCalendar();
 }
 
@@ -611,12 +633,15 @@ function dailySpend(from, to) {
 // 달력은 계산 기준(어느 달 몫인지)과 상관없이 실제 날짜 그대로 보여준다.
 // 예: 9/23에 일찍 들어온 월급은 10월 수입으로 계산되지만, 달력에는 9/23에 표시된다.
 function renderCalendar() {
-  const { start, end } = periodRange(state.period);
+  const week = state.view === 'home' && state.calMode === 'week';
+  if (week && !state.calWeek) state.calWeek = weekStart(state.calDay || today());
+  const { start, end } = week ? { start: state.calWeek, end: addDays(state.calWeek, 6) } : periodRange(state.period);
+  const per = week ? periodOfDate(start) : state.period; // 지출 많고 적음의 기준(평소 하루 지출)을 잡을 달
   const list = state.entries.filter(e => e.date >= start && e.date <= end);
   const ex = sumBy(list.filter(e => e.type === '지출'), e => e.date);
   const inc = sumBy(list.filter(e => e.type === '수입'), e => e.date);
   const t = today();
-  const past = dailySpend(periodRange(shiftPeriod(state.period, -12)).start, addDays(start, -1));
+  const past = dailySpend(periodRange(shiftPeriod(per, -12)).start, addDays(periodRange(per).start, -1));
   const ref = median(past.length ? past : [...ex.values()]);
   const level = v => LEVELS.findIndex(([r]) => v < ref * r) + 1;
 
@@ -1071,6 +1096,12 @@ document.addEventListener('click', ev => {
   if (d.pickok !== undefined) {
     const y = parseInt($('#mp-y').children[wheelIndex($('#mp-y'))].textContent), m = wheelIndex($('#mp-m')) + 1;
     $('#month-picker').close(); state.period = `${y}-${String(m).padStart(2, '0')}`; state.calDay = null; return refreshAll();
+  }
+  if (d.calmode) return setCalMode(d.calmode);
+  if (d.wshift) {
+    state.calWeek = addDays(state.calWeek, Number(d.wshift));
+    if (state.calDay) state.calDay = addDays(state.calDay, Number(d.wshift)); // 같은 요일을 계속 골라 둠
+    return renderHome();
   }
   if (d.pshift) { state.period = shiftPeriod(state.period, Number(d.pshift)); state.calDay = null; return refreshAll(); }
   if (d.trendtype) { state.trendType = d.trendtype; state.trendCat = ''; state.trendSel = null; state.trendScrolled = false; return renderTrend(); }
