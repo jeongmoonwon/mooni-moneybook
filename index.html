@@ -303,8 +303,9 @@
   <p class="note" style="margin:0">한 달 안에 이루는 도전이에요</p>
   <div class="field"><p class="label">무엇을</p><div class="chips" id="bm-kind"></div></div>
   <div class="field"><p class="label" id="bm-title-l">이름 (선택)</p><input class="input" id="bm-title" maxlength="20" autocomplete="off"></div>
-  <div class="field" id="bm-custom-f" hidden><p class="label">아이콘</p><div class="chips" id="bm-icon"></div>
-    <p class="note" style="margin-top:6px">직접 적은 배지는 앱이 셀 수 없어서, 홈에서 배지를 눌러 한 번씩 체크해요</p></div>
+  <div class="field" id="bm-custom-f" hidden><p class="label">아이콘 (선택)</p>
+    <input class="input bm-icon-in" id="bm-icon-in" maxlength="4" autocomplete="off" placeholder="예: 🚌">
+    <p class="note" style="margin-top:6px">직접 적은 배지는 앱이 셀 수 없어서, 홈에서 배지를 눌러 직접 기록해요</p></div>
   <div class="field" id="bm-cat-f"><p class="label">어떤 걸 (선택)</p><div class="chips" id="bm-cat"></div></div>
   <div class="field" id="bm-n-f"><p class="label">얼마나</p>
     <div class="chips" id="bm-unit" style="margin-bottom:8px"></div>
@@ -319,7 +320,11 @@
 <!-- 직접 적은 배지 체크 -->
 <dialog id="badge-check"><div class="body">
   <div class="bc" id="bc-body"></div>
-  <div class="actions"><button class="btn ghost" data-bcstep="-1">− 하나 빼기</button><button class="btn primary" data-bcstep="1">＋ 했어요!</button></div>
+  <div class="field" id="bc-amt-f" hidden>
+    <input class="input amount num" id="bc-amt" inputmode="numeric" placeholder="0" autocomplete="off">
+    <div class="quick"><button class="chip sm" data-bcadd="1000">+1천</button><button class="chip sm" data-bcadd="5000">+5천</button><button class="chip sm" data-bcadd="10000">+1만</button><button class="chip sm" data-bcadd="50000">+5만</button></div>
+  </div>
+  <div class="actions"><button class="btn ghost" id="bc-minus" data-bcstep="-1">− 하나 빼기</button><button class="btn primary" id="bc-plus" data-bcstep="1">＋ 했어요!</button></div>
   <div class="actions" style="margin-top:8px"><button class="btn ghost" data-close>닫기</button></div>
 </div></dialog>
 

@@ -297,10 +297,9 @@ const BADGE_KINDS = {
   regret: { icon: '🌱', color: '#B8E0A0', label: '후회 줄이기', units: ['count'] },
   daily: { icon: '🔥', color: '#FFB566', label: '꾸준히 기록', units: ['days'] },
   budget: { icon: '🎯', color: '#F7A3BE', label: '예산 지키기', units: [] },
-  custom: { icon: '✏️', color: '#C8B6FF', label: '직접 적기', units: ['count'] }, // 기록으로 못 세니 홈에서 눌러 직접 체크
+  custom: { icon: '✏️', color: '#C8B6FF', label: '직접 적기', units: ['count', 'amount'] }, // 기록으로 못 세니 홈에서 눌러 직접 기록
 };
 const BADGE_COLORS = ['#FFB59A', '#FFDB6E', '#8ED9B4', '#9CC8FF', '#C8B6FF', '#F7A3BE', '#FFB566', '#B8E0A0', '#BFD7EA', '#E2C2A3'];
-const CUSTOM_ICONS = ['✏️', '🏃', '💪', '📚', '🧘', '🥗', '🚶', '💤', '🎨', '🍳', '💧', '🚭'];
 const badgeColor = b => b.color || BADGE_KINDS[b.kind].color;
 const CAT_ICON = { '식비': '🍚', '간식': '🍰', '카공': '☕', '생필품': '🧴', '취미/문화생활': '🎬', '자기개발': '📚', '의료/건강': '💊',
   '의류': '👕', '미용': '💇', '여행': '✈️', '경조사/선물': '🎁', '가전': '📺', '교통비': '🚌', '통신비': '📱', '월세': '🏠', '배달': '🛵' };
@@ -312,7 +311,7 @@ function badgeName(b) {
   if (b.title) return b.title;
   const c = b.cat ? b.cat + ' ' : '';
   return { held: `${c}${nfmt(b.n, b.unit)} 참기`, reduce: `${c || '지출 '}${nfmt(b.n, b.unit)} 이하`, sat: `만족 ${b.n}% 넘기기`,
-    regret: `후회 ${b.n}번 이하`, custom: `나만의 목표 ${b.n}번`, daily: `${b.n}일 기록하기`, budget: '예산 안에서 쓰기' }[b.kind];
+    regret: `후회 ${b.n}번 이하`, custom: `나만의 목표 ${nfmt(b.n, b.unit)}`, daily: `${b.n}일 기록하기`, budget: '예산 안에서 쓰기' }[b.kind];
 }
 const badgeIcon = b => b.icon || (b.cat && CAT_ICON[b.cat]) || BADGE_KINDS[b.kind].icon;
 const badgesOf = key => ((state.settings.badges || {})[key] || []).filter(b => BADGE_KINDS[b.kind]); // 없어진 종류(예전 '리뷰 다 하기')는 건너뜀
@@ -329,8 +328,8 @@ function badgeProgress(b, key) {
   const keepUnder = (used, n, unit) => used > n ? { fill: 0, label: '넘었어요', fail: true }
     : past ? { fill: 1, label: '받았어요', done: true } : { fill: elapsed, label: `${nfmt(n - used, unit)} 남음` };
   if (b.kind === 'custom') {
-    const v = b.count || 0;
-    return v >= b.n ? { fill: 1, label: '받았어요', done: true } : { fill: v / b.n, label: `${v} / ${b.n}번 · 눌러서 체크`, fail: past };
+    const v = b.count || 0, u = b.unit || 'count';
+    return v >= b.n ? { fill: 1, label: '받았어요', done: true } : { fill: v / b.n, label: `${nfmt(v, u)} / ${nfmt(b.n, u)} · 눌러서 기록`, fail: past };
   }
   if (b.kind === 'held') {
     const v = val(state.held.filter(h => periodOf(h) === key && (!b.cat || h.category === b.cat)), b.unit);
@@ -463,12 +462,12 @@ function renderBadgeMaker() {
   const m = state.maker, K = BADGE_KINDS[m.kind], lv = makerLevels(m);
   if (!K.units.includes(m.unit)) m.unit = K.units[0];
   if (!K.cat) m.cat = '';
-  $('#bm-kind').innerHTML = Object.entries(BADGE_KINDS).map(([k, v]) => `<button class="chip" data-bmkind="${k}" aria-pressed="${m.kind === k}">${v.icon} ${v.label}</button>`).join('');
+  $('#bm-kind').innerHTML = Object.entries(BADGE_KINDS).map(([k, v]) => `<button class="chip${k === 'custom' ? ' bm-custom' : ''}" data-bmkind="${k}" aria-pressed="${m.kind === k}">${v.icon} ${v.label}</button>`).join('');
   $('#bm-cat-f').hidden = !K.cat;
   $('#bm-cat').innerHTML = ['', ...cats('지출')].map(c => `<button class="chip sm" data-bmcat="${esc(c)}" aria-pressed="${m.cat === c}">${c ? esc(c) : '전체'}</button>`).join('');
   const custom = m.kind === 'custom';
   $('#bm-custom-f').hidden = !custom;
-  if (custom) $('#bm-icon').innerHTML = CUSTOM_ICONS.map(ic => `<button class="chip" data-bmicon="${ic}" aria-pressed="${(m.icon || '✏️') === ic}">${ic}</button>`).join('');
+  if (custom && document.activeElement !== $('#bm-icon-in')) $('#bm-icon-in').value = m.icon || '';
   $('#bm-n-f').hidden = !K.units.length;
   if (K.units.length) {
     $('#bm-unit').innerHTML = K.units.length > 1 ? K.units.map(u => `<button class="chip sm" data-bmunit="${u}" aria-pressed="${m.unit === u}">${u === 'amount' ? '금액으로' : '횟수로'}</button>`).join('') : '';
@@ -479,7 +478,7 @@ function renderBadgeMaker() {
   }
   $('#bm-color').innerHTML = BADGE_COLORS.map(c => `<button class="bm-sw" data-bmcolor="${c}" style="background:${c}" aria-pressed="${badgeColor(m) === c}" aria-label="색 ${c}"></button>`).join('');
   $('#bm-title-l').textContent = custom ? '무엇을 할까요?' : '이름 (선택)';
-  $('#bm-title').placeholder = custom ? '예: 아침 운동하기, 도시락 싸기' : badgeName({ ...m, title: '' });
+  $('#bm-title').placeholder = custom ? '예: 편의점 안 가기, 택시 대신 버스, 아낀 돈 모으기' : badgeName({ ...m, title: '' });
   if (document.activeElement !== $('#bm-title')) $('#bm-title').value = m.title || '';
   $('#bm-prev').innerHTML = `${badgeHtml(m, { fill: 1, done: true })}<span><b>${esc(badgeName(m))}</b><small>이번 달 안에 이루면 받아요</small></span>`;
 }
@@ -493,7 +492,7 @@ function saveBadgeMaker() {
   const m = state.maker, { idx, ...b } = m;
   b.title = $('#bm-title').value.trim();
   if (b.kind === 'custom' && !b.title) { toast('무엇을 할지 적어 주세요'); return $('#bm-title').focus(); }
-  if (b.kind !== 'custom') delete b.icon;
+  if (b.kind !== 'custom' || !b.icon) delete b.icon; // Firestore는 undefined 값을 못 받음
   if (BADGE_KINDS[b.kind].units.length && !b.n && b.kind !== 'reduce' && b.kind !== 'regret') { toast('목표 숫자를 넣어 주세요'); return $('#bm-n-in').focus(); }
   if (idx != null) state.badgeDraft[idx] = { ...state.badgeDraft[idx], ...b };
   else state.badgeDraft.push({ ...b, id: newId(), origin: 'mine' });
@@ -506,14 +505,24 @@ function openBadgeCheck(i) {
 }
 function renderBadgeCheck() {
   const key = periodOfDate(today()), b = badgesOf(key)[state.bcheck]; if (!b) return;
+  const u = b.unit || 'count';
   $('#bc-body').innerHTML = `${badgeHtml(b, badgeProgress(b, key))}<h3>${esc(badgeName(b))}</h3>
-    <p class="num">${b.count || 0} / ${b.n}번</p>`;
+    <p class="num">${nfmt(b.count || 0, u)} / ${nfmt(b.n, u)}</p>`;
+  $('#bc-amt-f').hidden = u !== 'amount';
+  $('#bc-plus').textContent = u === 'amount' ? '＋ 더하기' : '＋ 했어요!';
+  $('#bc-minus').textContent = u === 'amount' ? '− 빼기' : '− 하나 빼기';
 }
 function badgeCheckStep(dir) {
   const key = periodOfDate(today()), list = badgesOf(key).map(x => ({ ...x })), b = list[state.bcheck]; if (!b) return;
-  b.count = Math.max(0, (b.count || 0) + dir);
+  let step = 1;
+  if ((b.unit || 'count') === 'amount') { // 금액 배지는 입력한 금액만큼 더하고 뺀다
+    step = Number($('#bc-amt').value.replace(/[^\d]/g, '')) || 0;
+    if (!step) { toast('금액을 입력해 주세요'); return $('#bc-amt').focus(); }
+    $('#bc-amt').value = '';
+  }
+  b.count = Math.max(0, (b.count || 0) + dir * step);
   saveBadges(key, list); renderBadgeCheck(); renderHome();
-  if (dir > 0) toast(b.count >= b.n ? `🎉 '${badgeName(b)}' 배지를 받았어요!` : '체크했어요 👍');
+  if (dir > 0) toast(b.count >= b.n ? `🎉 '${badgeName(b)}' 배지를 받았어요!` : '기록했어요 👍');
 }
 
 function openEarned() {
@@ -1620,9 +1629,9 @@ document.addEventListener('click', ev => {
   if (d.bmunit) { state.maker.unit = d.bmunit; const lv = makerLevels(state.maker); if (lv) state.maker.n = lv[1]; return renderBadgeMaker(); }
   if (d.bmlv) { state.maker.n = Number(d.bmlv); return renderBadgeMaker(); }
   if (d.bmcolor) { state.maker.color = d.bmcolor; return renderBadgeMaker(); }
-  if (d.bmicon) { state.maker.icon = d.bmicon; return renderBadgeMaker(); }
   if (d.bcheck !== undefined) return openBadgeCheck(Number(d.bcheck));
   if (d.bcstep) return badgeCheckStep(Number(d.bcstep));
+  if (d.bcadd) { const el = $('#bc-amt'), n = (Number(el.value.replace(/[^\d]/g, '')) || 0) + Number(d.bcadd); el.value = n.toLocaleString('ko-KR'); return; }
   if (d.bmsave !== undefined) return saveBadgeMaker();
   if (d.goalok !== undefined) return saveGoal();
   if (d.review !== undefined) return openReview();
@@ -1691,6 +1700,8 @@ $('#s-rv-min').addEventListener('keydown', e => { if (e.key === 'Enter') e.targe
 $('#s-rv-days').addEventListener('change', e => saveReviewCfg({ days: Number(e.target.value) }));
 $('#g-text').addEventListener('keydown', e => { if (e.key === 'Enter') saveGoal(); });
 $('#bm-n-in').addEventListener('input', e => makerNumInput(e.target));
+$('#bm-icon-in').addEventListener('input', e => { state.maker.icon = e.target.value.trim() || undefined; renderBadgeMaker(); });
+$('#bc-amt').addEventListener('input', e => { const n = Number(e.target.value.replace(/[^\d]/g, '')); e.target.value = n ? n.toLocaleString('ko-KR') : ''; });
 $('#bm-title').addEventListener('input', e => { state.maker.title = e.target.value; $('#bm-prev').innerHTML = `${badgeHtml(state.maker, { fill: 1, done: true })}<span><b>${esc(badgeName({ ...state.maker, title: e.target.value.trim() }))}</b><small>이번 달 안에 이루면 받아요</small></span>`; });
 $('#s-mood-new').addEventListener('keydown', e => { if (e.key === 'Enter') addMood(); });
 $('#f-amount').addEventListener('input', () => setAmount(amountValue()));

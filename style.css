@@ -601,3 +601,5 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 .bc .bd > span{font-size:38px}
 .bc h3{margin:10px 0 2px;font-size:18px}
 .bc p{margin:0;color:var(--mu)}
+.bm-custom{border-style:dashed!important;border-color:var(--ink)}
+.bm-icon-in{width:120px;font-size:18px;text-align:center}
