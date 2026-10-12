@@ -1130,10 +1130,10 @@ function renderBudgetTotal() {
   if (v > Number(sl.max)) sl.max = catScale(v, 0, 0);
   sl.value = v; paintBudgetSlider(); renderTotalScale();
 }
-// 카테고리 막대는 모두 같은 눈금이라 서로 길이를 견줄 수 있다: 가장 큰 예산·평소 금액이 넉넉히 들어가는 끝값
+// 카테고리 막대는 모두 같은 눈금이라 서로 길이를 견줄 수 있다: 기본 끝값 50만, 가장 큰 예산·평소 금액이 안 들어가면 넉넉히 늘림
 function budScale() {
   const avg = state.budAvg || {};
-  return catScale(Math.max(0, ...cats('지출').map(c => Math.max(state.budDraft[c] || 0, avg[c] || 0))), 0, 0);
+  return Math.max(500000, catScale(Math.max(0, ...cats('지출').map(c => Math.max(state.budDraft[c] || 0, avg[c] || 0))), 0, 0));
 }
 function renderBudgetSheet() {
   renderBudgetTotal();
