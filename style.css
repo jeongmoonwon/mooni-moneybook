@@ -10,7 +10,7 @@
   --up:#E5534B; --down:#4C8BE0; --income:#36A66B;
   --lv1:#f29488; --lv2:#e8665a; --lv3:#d03b30; --lv4:#9e231b;
   --cell1:#fde4e1; --cell2:#f9c3bc; --cell3:#f29488; --cell4:#e8665a; --ex-ink:#7a1f2b; /* 달력 칸: 지출 많을수록 진하게 */
-  --c1:#FFB59A; --c2:#9CC8FF; --c3:#FFDB6E; --c4:#C8B6FF; --c5:#8ED9B4; --c-other:#E2C2A3; /* 원그래프 카테고리 색 = 배지 색과 같은 파스텔 (순서 고정) */
+  --c-other:#E2C2A3; /* 원그래프 '그 외' 색. 카테고리 색은 app.js CAT_COLORS */
   --kfont:"Poor Story"; --round:"Jua";
 }
 @media (prefers-color-scheme: dark){
@@ -25,7 +25,7 @@
     --up:#F07068; --down:#6FA2F0; --income:#4CC08A;
     --lv1:#9a3028; --lv2:#c2463b; --lv3:#e6766b; --lv4:#f6b3aa;
     --cell1:#3e2420; --cell2:#5a2a24; --cell3:#7d332b; --cell4:#a13c31; --ex-ink:#ffb8b0;
-    --c1:#FFB59A; --c2:#9CC8FF; --c3:#FFDB6E; --c4:#C8B6FF; --c5:#8ED9B4; --c-other:#E2C2A3;
+    --c-other:#E2C2A3;
   }
 }
 /* 설정에서 '항상 어둡게'를 고른 경우 */
@@ -40,7 +40,7 @@
     --up:#F07068; --down:#6FA2F0; --income:#4CC08A;
     --lv1:#9a3028; --lv2:#c2463b; --lv3:#e6766b; --lv4:#f6b3aa;
     --cell1:#3e2420; --cell2:#5a2a24; --cell3:#7d332b; --cell4:#a13c31; --ex-ink:#ffb8b0;
-    --c1:#FFB59A; --c2:#9CC8FF; --c3:#FFDB6E; --c4:#C8B6FF; --c5:#8ED9B4; --c-other:#E2C2A3;
+    --c-other:#E2C2A3;
   }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--page);color:var(--t1)}
@@ -198,6 +198,10 @@ button.title:active{background:var(--wash)}
 .cb-toggle{display:flex;justify-content:space-between;align-items:center;width:100%;margin-top:16px;padding:12px 14px;border:0;border-radius:14px;background:var(--wash);font-weight:700;font-size:14px;color:var(--t1)}
 .cb-toggle i{font-style:normal;font-size:12px;color:var(--t-strong)}
 .cb-scale{display:flex;justify-content:space-between;font-size:9px;color:var(--mu);margin:2px 8px 0}
+.cb-scale{position:relative;height:13px}
+.cb-avg{position:absolute;inset:0;pointer-events:none}
+.cb-max{margin-left:auto}
+.cb-avg i{position:absolute;top:0;font-style:normal;white-space:nowrap;color:var(--t-strong);font-weight:600}
 .cb-foot{display:flex;justify-content:space-between;gap:8px;margin-top:6px}
 .cb-hint{margin:10px 0 0;font-size:11px;color:var(--mu);text-align:center}
 .bud-note{margin:12px 0 0;font-size:13px;font-weight:600;border-radius:12px;padding:9px 12px;background:var(--wash);color:var(--t2)}

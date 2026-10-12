@@ -971,12 +971,12 @@ function renderLookback(exp, held) {
 // 그 뒤 카테고리마다 손잡이로 조정한다. 그 달에 안 정했으면 직전에 정한 달의 값을 쓴다. 총 예산 = 카테고리 예산의 합
 function catAverages(key) {
   const b = baseline(key);
-  return Object.fromEntries(cats('지출').map(c => [c, Math.round(b.avg('지출|' + c) / 10000) * 10000]));
+  return Object.fromEntries(cats('지출').map(c => [c, Math.round(b.avg('지출|' + c) / 1000) * 1000]));
 }
 function catBudgetsOf(key) {
   const all = state.settings.catBudgets || {};
   const prevKey = Object.keys(all).filter(k => k < key).sort().at(-1);
-  const base = all[key] || (prevKey && all[prevKey]) || {}, avg = catAverages(key); // avg는 막대 눈금 정할 때만 씀
+  const base = all[key] || (prevKey && all[prevKey]) || {}, avg = catAverages(key); // avg는 예산 창 막대의 ▲ 평소 금액 · 눈금에 씀
   return { map: Object.fromEntries(cats('지출').map(c => [c, base[c] || 0])), avg };
 }
 const sumOf = map => Object.values(map).reduce((a, b) => a + b, 0);
@@ -1027,6 +1027,14 @@ function catSpendSection(map, byCat) {
       <span class="cs-track">${bar}</span>${over ? `<span class="cs-over">예산보다 ${compact(s - b)}원 더 썼어요</span>` : ''}</button>`;
     }).join('')}</div>`;
 }
+// 원그래프 카테고리 색: 순위가 아니라 카테고리마다 고정(카테고리 목록 순서대로 배지 파스텔). 목록에 없는 카테고리는 이름으로 고름
+// '그 외' 색(#E2C2A3)은 빼 둠
+const CAT_COLORS = ['#FFB59A', '#9CC8FF', '#FFDB6E', '#C8B6FF', '#8ED9B4', '#F7A3BE', '#FFB566', '#B8E0A0', '#BFD7EA'];
+function catColor(c) {
+  let i = cats('지출').indexOf(c);
+  if (i < 0) i = [...c].reduce((h, ch) => h * 31 + ch.charCodeAt(0), 7) >>> 0;
+  return CAT_COLORS[i % CAT_COLORS.length];
+}
 // 카테고리별 지출 비율 원그래프: 큰 순서로 5개(5% 이상)만 따로, 나머지는 '기타'. 조각 사이 2px 틈.
 // 범례 대신 각 조각 바깥쪽에 이름·비율을 글자로 붙인다 (색 위에 글자를 얹으면 밝은 색에서 안 읽혀서)
 function catPieHtml(byCat) {
@@ -1035,7 +1043,7 @@ function catPieHtml(byCat) {
   if (!total) return '';
   const top = rows.slice(0, 5).filter(([, v]) => v / total >= 0.05), restRows = rows.slice(top.length);
   const rest = restRows.reduce((s, [, v]) => s + v, 0);
-  const parts = top.map(([c, v], i) => ({ c, v, color: `var(--c${i + 1})` }));
+  const parts = top.map(([c, v]) => ({ c, v, color: catColor(c) }));
   // 작은 카테고리는 '그 외'로 묶음 (지출 카테고리 '기타'와 헷갈리지 않게 다른 이름). 누르면 옆에 안에 든 카테고리가 펼쳐짐
   if (rest) parts.push({ c: '그 외', v: rest, color: 'var(--c-other)', etc: restRows.map(([c]) => c).join(', ') });
   const CX = 170, CY = 118, R = 74, W = 30, C = 2 * Math.PI * R, GAP = parts.length > 1 ? 2 : 0;
@@ -1089,10 +1097,9 @@ function openBudget() {
   const [y, m] = state.period.split('-').map(Number), cb = catBudgetsOf(state.period);
   state.budDraft = { ...cb.map }; state.budAvg = cb.avg;
   $('#b-title').textContent = `${y}년 ${m}월 예산`;
-  const v = sumOf(state.budDraft), avg = baseline(state.period).avg('지출');
-  const max = catScale(v, avg * 2 / 1.2, 1500000), sl = $('#b-slider');
-  sl.max = max; sl.step = 10000;
-  $('#b-scale').innerHTML = `<span>0</span>${avg ? `<span class="b-avg" style="left:${avg / max * 100}%">▲ 최근 평균 ${compact(avg)}</span>` : ''}<span>${compact(max)}</span>`;
+  const v = sumOf(state.budDraft), avg = baseline(state.period).avg('지출'), sl = $('#b-slider');
+  state.budTotalAvg = avg;
+  sl.max = catScale(v, avg * 2 / 1.2, 1500000); sl.step = 10000;
   if (!v && avg) splitBudget(Math.round(avg / 10000) * 10000, true);
   renderBudgetSheet();
   $('#budget-editor').showModal(); document.activeElement.blur();
@@ -1109,15 +1116,26 @@ function splitBudget(total, equal) {
     state.budDraft[big] += total - acc; // 반올림 차이는 가장 큰 카테고리에서 맞춤
   }
 }
+// 전체 막대 눈금: 0 · ▲최근 평균 · 끝값. 끝값은 금액이 넘으면 늘어난다
+function renderTotalScale() {
+  const sl = $('#b-slider'), max = Number(sl.max), avg = state.budTotalAvg;
+  $('#b-scale').innerHTML = `<span>0</span>${avg && avg < max ? `<span class="b-avg" style="left:${avg / max * 100}%">▲ 최근 평균 ${compact(avg)}</span>` : ''}<span>${compact(max)}</span>`;
+}
 function renderBudgetTotal() {
   const v = sumOf(state.budDraft), sl = $('#b-slider');
   $('#b-amount').value = v ? v.toLocaleString('ko-KR') : '';
   if (v > Number(sl.max)) sl.max = catScale(v, 0, 0);
-  sl.value = v; paintBudgetSlider();
+  sl.value = v; paintBudgetSlider(); renderTotalScale();
+}
+// 카테고리 막대는 모두 같은 눈금이라 서로 길이를 견줄 수 있다: 가장 큰 예산·평소 금액이 넉넉히 들어가는 끝값
+function budScale() {
+  const avg = state.budAvg || {};
+  return catScale(Math.max(0, ...cats('지출').map(c => Math.max(state.budDraft[c] || 0, avg[c] || 0))), 0, 0);
 }
 function renderBudgetSheet() {
   renderBudgetTotal();
-  $('#b-cats').innerHTML = cats('지출').map(c => cbRowHtml(c, state.budDraft[c] || 0)).join('');
+  const M = state.budScale = budScale();
+  $('#b-cats').innerHTML = cats('지출').map(c => cbRowHtml(c, state.budDraft[c] || 0, M)).join('');
 }
 function paintBudgetSlider() { // 막대의 채워진 부분 색칠
   const sl = $('#b-slider'); sl.style.setProperty('--p', `${Math.min(100, sl.value / sl.max * 100)}%`);
@@ -1129,41 +1147,72 @@ function saveBudget() {
   saveCatBudgets({ ...state.budDraft });
   toast('예산을 저장했어요');
 }
-// 예산 창의 카테고리 줄: 지출은 보여주지 않고 예산만 (막대 끝은 카테고리마다 최근 12개월 평균의 약 2배)
+// 예산 창의 카테고리 줄: 지출은 보여주지 않고 예산만. 막대 아래 ▲는 그 카테고리 평소(최근 12개월 평균) 지출
 function cbRowHtml(c, b, M) {
-  M = M || catScale(b, 0, (state.budAvg || {})[c] || 0);
-  const pct = v => `${Math.min(100, v / M * 100)}%`;
-  return `<div class="cb-row" data-cbcat="${esc(c)}" data-scale="${M}">
+  const pct = v => `${Math.min(100, v / M * 100)}%`, avg = (state.budAvg || {})[c] || 0;
+  return `<div class="cb-row" data-cbcat="${esc(c)}">
     <div class="cb-head"><span class="cb-name">${esc(c)}</span><span class="cb-amt num"><b>${b ? won(b) : '–'}</b></span></div>
     <div class="cb-track"><i class="cb-fill bud" style="width:${pct(b)}"></i>
       <button class="cb-knob" style="left:${pct(b)}" aria-label="${esc(c)} 예산 ${won(b)}, 좌우로 끌어서 바꾸기"></button></div>
-    <div class="cb-scale num"><span>0</span><span>${compact(M)}</span></div>
+    <div class="cb-scale num">${avg ? `<span class="cb-avg">${avgLabel(avg, M)}</span>` : '<span></span>'}<span class="cb-max">${compact(M)}</span></div>
   </div>`;
+}
+// ▲가 막대 오른쪽에 가까우면 글자를 ▲ 왼쪽에 둬서 끝값과 겹치지 않게
+function avgLabel(avg, M) {
+  const p = Math.min(100, avg / M * 100), right = p > 55;
+  return `<i style="left:${p}%;transform:translateX(${right ? 'calc(-100% + 4px)' : '-4px'})">${right ? `평소 ${compact(avg)} ▲` : `▲ 평소 ${compact(avg)}`}</i>`;
+}
+// 눈금이 바뀌면(끝까지 끌어서 늘어날 때) 모든 줄의 막대 · 손잡이 · ▲ 위치를 다시 맞춘다
+function paintBudgetRows() {
+  const M = state.budScale, avg = state.budAvg || {}, pct = v => `${Math.min(100, v / M * 100)}%`;
+  for (const row of $('#b-cats').children) {
+    const c = row.dataset.cbcat, b = state.budDraft[c] || 0;
+    row.querySelector('.cb-amt b').textContent = b ? won(b) : '–';
+    row.querySelector('.cb-fill').style.width = row.querySelector('.cb-knob').style.left = pct(b);
+    const a = row.querySelector('.cb-avg'); if (a) a.innerHTML = avgLabel(avg[c] || 0, M);
+    row.querySelector('.cb-max').textContent = compact(M);
+  }
 }
 function saveCatBudgets(map) {
   state.settings.catBudgets = { ...state.settings.catBudgets, [state.period]: map }; // 저장이 돌아오기 전에도 바로 보이게
   renderMonth();
   store.saveSettings({ catBudgets: state.settings.catBudgets }).catch(err => toast('예산 저장 실패: ' + errMsg(err)));
 }
-// 손잡이 끌기: 끄는 동안은 그 줄과 전체 금액만 고쳐서 손가락을 놓치지 않게 한다
+// 손잡이 끌기: 누른 곳에서 움직인 만큼만 바꾼다(톡 누르기만 하면 금액이 그대로). 오른쪽 끝에 대고 있으면 눈금이 점점 늘어난다
 function budDragStart(ev) {
   const knob = ev.target.closest('.cb-knob'); if (!knob) return;
   const tr = knob.parentElement, row = tr.closest('.cb-row'), c = row.dataset.cbcat;
-  const M = Number(row.dataset.scale), step = M <= 100000 ? 1000 : M <= 500000 ? 5000 : 10000; // 끄는 동안 이 줄의 눈금은 고정
+  let x0 = ev.clientX, v0 = state.budDraft[c] || 0;
+  let lastX = x0, moved = false, grow = null;
   ev.preventDefault();
   knob.classList.add('on');
-  const move = e => {
-    const r = tr.getBoundingClientRect(), x = Math.min(Math.max(e.clientX - r.left, 0), r.width);
-    const v = Math.round(x / r.width * M / step) * step;
+  const step = () => { const M = state.budScale; return M <= 100000 ? 1000 : M <= 500000 ? 5000 : 10000; };
+  const set = v => {
     if (v === state.budDraft[c]) return;
-    state.budDraft[c] = v;
-    row.querySelector('.cb-amt b').textContent = v ? won(v) : '–';
-    tr.querySelector('.cb-fill').style.width = knob.style.left = `${Math.min(100, v / M * 100)}%`;
-    renderBudgetTotal();
+    state.budDraft[c] = v; paintBudgetRows(); renderBudgetTotal();
+  };
+  const update = () => {
+    const r = tr.getBoundingClientRect(), M = state.budScale, st = step();
+    const v = Math.round((v0 + (lastX - x0) / r.width * M) / st) * st;
+    set(Math.min(Math.max(v, 0), M));
+    // 끝에 닿아 있으면 0.4초마다 눈금을 한 단계씩 늘려서 계속 끌 수 있게
+    const atEnd = lastX >= r.right - 2 || state.budDraft[c] >= M;
+    if (atEnd && !grow) grow = setInterval(() => { // 끝값을 한 칸(50만이면 10만)씩 늘리고 금액은 원래 끝값까지
+      const M0 = state.budScale; state.budScale = M0 + 10 ** Math.floor(Math.log10(M0));
+      state.budDraft[c] = M0; paintBudgetRows(); renderBudgetTotal();
+      x0 = lastX; v0 = state.budDraft[c]; // 늘어난 눈금에서 지금 위치부터 다시 끌기
+    }, 400);
+    if (!atEnd && grow) { clearInterval(grow); grow = null; }
+  };
+  const move = e => {
+    lastX = e.clientX;
+    if (!moved && Math.abs(lastX - x0) < 4) return; // 손 떨림 정도는 무시
+    moved = true; update();
   };
   const up = () => { // 손가락이 손잡이 밖으로 나가도 따라가도록 화면 전체에서 듣는다
     removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
-    knob.classList.remove('on');
+    clearInterval(grow); knob.classList.remove('on');
+    if (moved) renderBudgetSheet(); // 놓으면 눈금을 다시 맞춤(가장 큰 금액이 넉넉히 들어가게)
   };
   addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', up);
 }
@@ -1803,6 +1852,7 @@ $('#budget-editor').addEventListener('pointerdown', budDragStart);
 $('#b-amount').addEventListener('input', e => { const n = Number(e.target.value.replace(/[^\d]/g, '')); e.target.value = n ? n.toLocaleString('ko-KR') : ''; $('#b-slider').value = n; paintBudgetSlider(); });
 $('#b-amount').addEventListener('change', e => setBudgetTotal(Number(e.target.value.replace(/[^\d]/g, '')) || 0));
 $('#b-slider').addEventListener('input', e => setBudgetTotal(Number(e.target.value)));
+$('#b-slider').addEventListener('change', e => { const sl = e.target; if (Number(sl.value) >= Number(sl.max)) { sl.max = catScale(Number(sl.max), 0, 0); paintBudgetSlider(); renderTotalScale(); } });
 $('#b-amount').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
 $('#f-amount').addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
 $('#flt-type').addEventListener('change', e => { state.fltType = e.target.value; renderList(); });
