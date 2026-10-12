@@ -812,6 +812,9 @@ function setRvMin(n) { $('#s-rv-min').value = n ? n.toLocaleString('ko-KR') : ''
 // 설정은 묶음 목록 → 세부 화면 두 단계. 세부 화면에선 위 ‹ 로 목록으로 돌아감
 const SET_PAGES = { book: '가계부', look: '화면', review: '소비 리뷰', data: '데이터 · 계정' };
 function setPage(k) {
+  // 세부 화면은 오른쪽에서 밀려 들어오고, 목록으로 돌아갈 땐 왼쪽에서 들어옴 (새 화면이 뜨는 느낌)
+  const into = k ? document.querySelector(`#settings .set-page[data-page="${k}"]`) : $('#set-menu');
+  into.classList.remove('slide-in', 'slide-back'); void into.offsetWidth; into.classList.add(k ? 'slide-in' : 'slide-back');
   $('#set-menu').hidden = !!k;
   document.querySelectorAll('#settings .set-page').forEach(el => { el.hidden = el.dataset.page !== k; });
   $('#set-title').textContent = k ? SET_PAGES[k] : '설정';
@@ -1577,6 +1580,26 @@ function moveCategory(type, from, to) {
   if (state.type === type && state.category === from) state.category = to;
   if (state.fltType === type && state.fltCat === from) state.fltCat = to;
   if (list.length) store.moveEntries(list, to).catch(err => toast('기록 옮기기 실패: ' + errMsg(err)));
+  if (type === '지출') moveSpendSettings(from, to);
+}
+// 지출 카테고리 이름이 바뀌거나 합쳐지면 이름으로 저장해 둔 설정도 따라 바꾼다:
+// 소비 리뷰에서 고른 카테고리, 달마다 정한 카테고리 예산(합치면 더함), 배지의 카테고리
+function moveSpendSettings(from, to) {
+  const S = state.settings, patch = {};
+  const rc = reviewCfg().cats;
+  if (rc && rc.includes(from)) patch.review = state.settings.review = { ...reviewCfg(), cats: [...new Set(rc.map(c => c === from ? to : c))] };
+  const cb = S.catBudgets || {};
+  if (Object.values(cb).some(m => m && from in m)) {
+    patch.catBudgets = S.catBudgets = Object.fromEntries(Object.entries(cb).map(([k, m]) => {
+      if (!m || !(from in m)) return [k, m];
+      const { [from]: v, ...rest } = m; return [k, { ...rest, [to]: (rest[to] || 0) + v }];
+    }));
+  }
+  const bg = S.badges || {};
+  if (Object.values(bg).some(L => L.some(b => b.cat === from))) {
+    patch.badges = S.badges = Object.fromEntries(Object.entries(bg).map(([k, L]) => [k, L.map(b => b.cat === from ? { ...b, cat: to } : b)]));
+  }
+  if (Object.keys(patch).length) store.saveSettings(patch).catch(err => toast('설정 저장 실패: ' + errMsg(err)));
 }
 
 function addCat() {
@@ -1823,7 +1846,7 @@ document.addEventListener('click', ev => {
     case 'del': return removeEditing();
     case 'open-settings': return openSettings();
     case 'open-export': return openExport();
-    case 'open-cats': if ($('#settings').open) $('#settings').close(); return openCats();
+    case 'open-cats': $('#cat-editor').classList.toggle('full', $('#settings').open); return openCats(); // 설정에서 열면 설정 위에 전체 화면으로, 닫으면 설정으로 돌아감
     case 'ce-add': return addCat();
     case 'ce-del-ok': return confirmDeleteCat();
     case 'ce-del-cancel': state.ceDelete = null; return renderCats();
