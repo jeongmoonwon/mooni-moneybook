@@ -642,8 +642,10 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 .set-item b{display:block;font-size:15px}
 .set-item small{display:block;font-size:12px;color:var(--mu)}
 .set-item .si-go{color:var(--mu);font-size:20px}
-.set-back{font-size:22px;color:var(--t2);margin:0 4px 0 -6px}
-#settings .sheet-head h2{flex:1}
+.set-back{font-size:30px;line-height:1;color:var(--t1);margin:0 4px 0 -6px}
+#settings .sheet-head h2,.ce-head h2{flex:1}
+#cat-editor:not(.full) .ce-head .set-back{display:none} /* 기록하기에서 연 카드 모양일 땐 ‹ 없이 */
+.ce-head{margin-bottom:16px}
 /* 설정은 카드 대신 전체 화면. 세부 화면도 같은 창 안에서 옆으로 넘어감 */
 #settings,#cat-editor.full{margin:0 auto;width:min(520px,100%);max-width:100%;height:100%;max-height:100%;border-radius:0;
   padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}

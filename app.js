@@ -818,7 +818,7 @@ function setPage(k) {
   $('#set-menu').hidden = !!k;
   document.querySelectorAll('#settings .set-page').forEach(el => { el.hidden = el.dataset.page !== k; });
   $('#set-title').textContent = k ? SET_PAGES[k] : '설정';
-  $('[data-setback]').hidden = !k;
+  $('[data-setback]').setAttribute('aria-label', k ? '설정 목록으로' : '설정 나가기'); // 목록에서 ‹ 는 설정 닫기
   $('#settings .body').scrollTop = 0;
 }
 
@@ -1828,7 +1828,7 @@ document.addEventListener('click', ev => {
   if (d.rvadd !== undefined) { setRvMin(d.rvadd === '0' ? 0 : rvMinValue() + Number(d.rvadd)); return saveReviewCfg({ min: rvMinValue() }); }
   if (d.setok !== undefined) return applySettings();
   if (d.setpage) return setPage(d.setpage);
-  if (d.setback !== undefined) return setPage('');
+  if (d.setback !== undefined) return $('#set-menu').hidden ? setPage('') : $('#settings').close();
   if (d.pieetc) { state.pieEtc = !state.pieEtc; return renderMonth(); }
   if (d.lookfold) { state.lookOpen = { ...state.lookOpen, [d.lookfold]: !(state.lookOpen || {})[d.lookfold] }; return renderMonth(); }
   if (d.ffeel !== undefined) { state.formFeel = d.ffeel || 'none'; if (d.ffeel !== '후회') state.formMood = ''; return renderFormFeel(); }

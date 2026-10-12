@@ -125,7 +125,7 @@
 
 <!-- 설정 -->
 <dialog id="settings"><div class="body">
-  <div class="sheet-head" style="margin-bottom:12px"><button class="icon-btn set-back" data-setback aria-label="뒤로" hidden>‹</button><h2 id="set-title">설정</h2><button class="icon-btn" data-close aria-label="닫기">✕</button></div>
+  <div class="sheet-head" style="margin-bottom:12px"><button class="icon-btn set-back" data-setback aria-label="설정 나가기">‹</button><h2 id="set-title">설정</h2><button class="icon-btn" data-close aria-label="닫기">✕</button></div>
   <div class="set-menu" id="set-menu">
     <button class="set-item" data-setpage="book"><span class="si-ic">📒</span><span class="si-t"><b>가계부</b><small>이름 · 한 달 시작일 · 카테고리</small></span><span class="si-go">›</span></button>
     <button class="set-item" data-setpage="look"><span class="si-ic">🎨</span><span class="si-t"><b>화면</b><small>화면 모드 · 글씨체</small></span><span class="si-go">›</span></button>
@@ -215,7 +215,7 @@
 
 <!-- 카테고리 편집 -->
 <dialog id="cat-editor"><div class="body">
-  <h2>카테고리 편집</h2>
+  <div class="sheet-head ce-head"><button class="icon-btn set-back" data-close aria-label="설정으로 돌아가기">‹</button><h2>카테고리 편집</h2></div>
   <div class="seg" id="ce-seg" role="group" aria-label="구분"></div>
   <ul class="ce-list" id="ce-list"></ul>
   <div class="row" style="margin-top:12px">
