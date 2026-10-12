@@ -1144,7 +1144,13 @@ function paintBudgetSlider() { // 막대의 채워진 부분 색칠
   const sl = $('#b-slider'); sl.style.setProperty('--p', `${Math.min(100, sl.value / sl.max * 100)}%`);
 }
 function setBudgetTotal(v, equal) { splitBudget(v, equal); renderBudgetSheet(); }
+// 전체 칸에 입력만 하고 바로 버튼을 누르면 iOS는 change가 안 와서 초안에 반영이 안 됨 → 버튼 누를 때 칸의 값을 먼저 반영
+function applyBudgetInput() {
+  const typed = Number($('#b-amount').value.replace(/[^\d]/g, '')) || 0;
+  if (typed && typed !== sumOf(state.budDraft)) splitBudget(typed, false);
+}
 function saveBudget() {
+  applyBudgetInput();
   if (!sumOf(state.budDraft)) { toast('예산을 정해 주세요'); return; }
   $('#budget-editor').close();
   saveCatBudgets({ ...state.budDraft });
@@ -1770,7 +1776,7 @@ document.addEventListener('click', ev => {
   if (d.budget !== undefined) return openBudget();
   if (d.budgetok !== undefined) return saveBudget();
   if (d.budopen !== undefined) { state.budOpen = !state.budOpen; return renderMonth(); }
-  if (d.budsplit !== undefined) { setBudgetTotal(sumOf(state.budDraft) || Number($('#b-slider').value), true); return toast('카테고리마다 똑같이 나눴어요'); }
+  if (d.budsplit !== undefined) { applyBudgetInput(); setBudgetTotal(sumOf(state.budDraft) || Number($('#b-slider').value), true); return toast('카테고리마다 똑같이 나눴어요'); }
   if (d.goal !== undefined) return openGoal();
   if (d.badgeedit !== undefined) return openBadgeEditor();
   if (d.badgeall !== undefined) return openEarned();
