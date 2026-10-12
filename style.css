@@ -74,6 +74,8 @@ header h1{font-size:18px;margin:0;flex:1;letter-spacing:-.01em;display:flex;alig
 .input{width:100%;border:1.5px solid var(--border);background:var(--card);border-radius:14px;padding:11px 14px;outline:none}
 .input:focus{border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 18%,transparent)}
 .date-row .input{flex:1;text-align:center}
+/* iOS 사파리는 날짜 칸에 자체 최소 너비가 있어서 시트 밖으로 삐져나감 */
+input[type=date].input{-webkit-appearance:none;appearance:none;min-width:0;display:block;min-height:46px}
 .step{border:0;background:var(--wash);color:var(--t-strong);border-radius:14px;width:44px;height:44px;font-size:18px;font-weight:700}
 .amount{font-size:22px;font-weight:700;text-align:right}
 

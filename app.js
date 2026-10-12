@@ -135,13 +135,15 @@ function renderFormFeel() {
   $('#f-feel-note').textContent = f ? '' : '아직 리뷰하지 않았어요. 여기서 바로 골라도 돼요';
 }
 
-// 전체 기간 기록에서 이 카테고리 상세내역의 사용 횟수가 많은 순
+// 이 카테고리 상세내역을 최근에 자주 쓴 순: 한 번 쓸 때마다 1점인데 30일 지날 때마다 반씩 줄어서
+// 예전에 많이 쓴 것보다 요즘 입력하는 것이 금방 위로 올라온다
 function renderSuggest() {
-  const freq = new Map();
+  const freq = new Map(), now = Date.parse(today());
   for (const e of state.entries) {
     const detail = (e.detail || '').trim();
     if (e.type !== state.type || e.category !== state.category || !detail) continue;
-    freq.set(detail, (freq.get(detail) || 0) + 1);
+    const days = Math.max(0, (now - Date.parse(e.date)) / 864e5) || 0;
+    freq.set(detail, (freq.get(detail) || 0) + 0.5 ** (days / 30));
   }
   const top = [...freq].sort((a, b) => b[1] - a[1]).slice(0, 8).map(x => x[0]);
   $('#suggest').innerHTML = top.map(d => `<button class="chip sm" data-detail="${esc(d)}">${esc(d)}</button>`).join('');
@@ -270,6 +272,12 @@ function removeEditing() {
 /* ================= 홈 ================= */
 const HELD = '참음'; // 참은 소비는 기록과 같은 곳에 이 구분으로 저장
 const FEELS = { '필수': '🧾', '만족': '😊', '후회': '😣' };
+// 만족도: 만족 + 후회 금액 중 만족 비율(%). 필수는 좋고 나쁨이 없어서 뺀다. 둘 다 없으면 null
+function satRate(list) {
+  let sat = 0, reg = 0;
+  for (const e of list) { if (e.feel === '만족') sat += e.amount; else if (e.feel === '후회') reg += e.amount; }
+  return sat + reg ? Math.round(sat / (sat + reg) * 100) : null;
+}
 // 후회를 고르면 한 번 더 묻는 그때 기분 (타이핑 없이 톡)
 const MOODS = [['지쳐서', '😩'], ['스트레스', '😤'], ['심심해서', '🥱'], ['들떠서', '🎉'], ['분위기상', '🤝'], ['늦은 밤', '🌙']];
 // 설정에서 추가·삭제한 목록 (없으면 기본). Firestore는 배열 안에 배열을 못 담아서 {t, ic} 객체로 저장한다
@@ -355,9 +363,8 @@ function badgeProgress(b, key) {
     return budget ? keepUnder(val(exp, 'amount'), budget, 'amount') : { fill: 0, label: '예산을 정해 주세요' };
   }
   if (b.kind === 'sat') {
-    const rv = exp.filter(e => FEELS[e.feel]), tot = rv.reduce((s, e) => s + e.amount, 0);
-    if (!tot) return { fill: 0, label: '리뷰가 쌓이면 보여요', fail: past };
-    const r = Math.round(rv.filter(e => e.feel === '만족').reduce((s, e) => s + e.amount, 0) / tot * 100);
+    const r = satRate(exp);
+    if (r == null) return { fill: 0, label: '리뷰가 쌓이면 보여요', fail: past };
     return r >= b.n ? (past ? { fill: 1, label: '받았어요', done: true } : { fill: 1, label: `지금 ${r}% · 달성 중` })
       : { fill: r / b.n, label: `지금 ${r}%`, fail: past };
   }
@@ -435,10 +442,9 @@ function saveBadgeEditor() {
 // 지난달 기록으로 '조금만 더' 해 볼 만한 배지를 추천
 function lastMonthStats() {
   const key = shiftPeriod(periodOfDate(today()), -1), exp = periodEntries(key).filter(e => e.type === '지출');
-  const rv = exp.filter(e => FEELS[e.feel]), tot = rv.reduce((s, e) => s + e.amount, 0);
   const cnt = new Map(); for (const e of exp) cnt.set(e.category, (cnt.get(e.category) || 0) + 1);
   return { key, exp, cnt, held: state.held.filter(h => periodOf(h) === key).length,
-    sat: tot ? Math.round(rv.filter(e => e.feel === '만족').reduce((s, e) => s + e.amount, 0) / tot * 100) : null,
+    sat: satRate(exp),
     regret: exp.filter(e => e.feel === '후회').length };
 }
 function badgeRecs() {
@@ -592,11 +598,10 @@ function openEarned() {
 /* ================= 첫 화면: 나의 상태 · 월말 결산 ================= */
 // 한 달 결과로 다음 달 모습(병아리 + 장식)과 칭호를 정한다
 function monthStats(key) {
-  const exp = periodEntries(key).filter(e => e.type === '지출'), rv = exp.filter(e => FEELS[e.feel]);
-  const tot = rv.reduce((s, e) => s + e.amount, 0);
+  const exp = periodEntries(key).filter(e => e.type === '지출');
   return { days: new Set([...periodEntries(key), ...state.held.filter(h => periodOf(h) === key)].map(e => e.date)).size,
     held: state.held.filter(h => periodOf(h) === key).length,
-    sat: tot ? Math.round(rv.filter(e => e.feel === '만족').reduce((s, e) => s + e.amount, 0) / tot * 100) : null,
+    sat: satRate(exp),
     regret: exp.filter(e => e.feel === '후회').length,
     badges: badgesOf(key).filter(b => badgeProgress(b, key).done).length };
 }
@@ -942,11 +947,11 @@ function renderMonth() {
 
 }
 
-// 소비 만족도: 리뷰한 지출을 금액 기준으로 필수·만족·후회 비율로. 후회한 소비는 큰 순서로
-// 돌아보기: 만족 · 필수 · 후회 비율(금액 기준), 후회할 때 가장 많았던 기분, 후회한 소비와 참은 소비 목록(눌러야 펼쳐짐)
+// 소비 만족도: 리뷰한 지출 중 만족 · 후회 금액끼리 비율(필수는 빼고 금액만). 후회한 소비는 큰 순서로
+// 돌아보기: 만족 · 후회 비율(금액 기준), 필수 금액, 후회할 때 가장 많았던 기분, 후회한 소비와 참은 소비 목록(눌러야 펼쳐짐)
 function renderLookback(exp, held) {
   const done = exp.filter(e => FEELS[e.feel]), total = done.reduce((s, e) => s + e.amount, 0);
-  const by = sumBy(done, e => e.feel), pct = f => total ? Math.round((by.get(f) || 0) / total * 100) + '%' : '–';
+  const by = sumBy(done, e => e.feel), sat = satRate(done);
   const regret = done.filter(e => e.feel === '후회').sort((a, b) => b.amount - a.amount);
   const moods = new Map(); for (const e of regret) if (e.mood) moods.set(e.mood, (moods.get(e.mood) || 0) + 1);
   const topMood = [...moods].sort((a, b) => b[1] - a[1])[0], moodIc = moodIcon;
@@ -956,7 +961,7 @@ function renderLookback(exp, held) {
     ${open[k] ? (list.length ? `<ul class="list">${list.map(html).join('')}</ul>` : `<p class="empty" style="padding:4px 0">${empty}</p>`) : ''}`;
   $('#lookback').innerHTML = `<h2 style="margin-bottom:2px">돌아보기</h2>
     <p class="label">${done.length ? `리뷰한 지출 ${done.length}건 · ${won(total)} 기준` : `아직 리뷰한 소비가 없어요 · ${won(reviewCfg().min)} 이상 지출을 ${reviewCfg().days}일 뒤 물어봐요`}</p>
-    <div class="lb-nums"><div><b>${pct('만족')}</b><small>😊 만족</small></div><div><b>${pct('필수')}</b><small>🧾 필수</small></div><div class="warn"><b>${pct('후회')}</b><small>😣 후회</small></div><div class="held"><b>${held.length}번</b><small>🙌 참음${saved ? ` · ${compact(saved)}` : ''}</small></div></div>
+    <div class="lb-nums"><div><b>${sat != null ? sat + '%' : '–'}</b><small>😊 만족</small></div><div class="warn"><b>${sat != null ? 100 - sat + '%' : '–'}</b><small>😣 후회</small></div><div><b>${by.get('필수') ? compact(by.get('필수')) : '–'}</b><small>🧾 필수</small></div><div class="held"><b>${held.length}번</b><small>🙌 참음${saved ? ` · ${compact(saved)}` : ''}</small></div></div>
     ${topMood ? `<p class="lb-mood">후회할 때 가장 많았던 기분 · <b>${moodIc(topMood[0])} ${esc(topMood[0])}</b> ${topMood[1]}번</p>` : ''}
     ${fold('regret', `😣 후회한 소비 ${regret.length}개`, regret, regretItem, '후회한 소비가 없어요')}
     ${fold('held', `🙌 참은 소비 ${held.length}개`, held.slice().sort((a, b) => b.date.localeCompare(a.date)), heldItemHtml, '사려다 참은 게 있으면 홈에서 기록해 보세요')}`;
