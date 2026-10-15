@@ -484,8 +484,8 @@ function renderEmoGrid() {
       return `<div class="eg-cell ${cls}" style="--p:${n ? p : 0}%"${n / max > .6 ? ' data-strong' : ''}>${n || ''}</div>`; }).join('')).join(''); };
   const body = exp.length ? `<div class="eg" style="grid-template-columns:84px repeat(${cols.length},1fr)"><div></div>${cols.map(c => `<div class="eg-h">${esc(c)}</div>`).join('')}
       ${group('만족', 'good', '😊 만족할 때')}${group('후회', 'bad', '😣 후회할 때')}</div>
-    <div class="eg-sum"><img src="img/hamster-3.webp" alt=""><span>${[top.만족 && `😊 <b>'${esc(top.만족.m)}'</b> 쓴 <b>${esc(top.만족.c)}</b>에 가장 만족했어요`,
-      top.후회 && `😣 <b>'${esc(top.후회.m)}'</b> 쓴 <b>${esc(top.후회.c)}</b>를 가장 후회했어요`].filter(Boolean).join('<br>')}</span></div>`
+    <div class="eg-sum"><img src="img/hamster-3.webp" alt=""><span>${[top.만족 && `가장 만족한 조합 · <b>${moodIcon(top.만족.m)} ${esc(top.만족.m)} × ${esc(top.만족.c)}</b>`,
+      top.후회 && `가장 후회한 조합 · <b>${moodIcon(top.후회.m)} ${esc(top.후회.m)} × ${esc(top.후회.c)}</b>`].filter(Boolean).join('<br>')}</span></div>`
     : '<p class="empty" style="padding:8px 0">이 기간에 리뷰하며 고른 기분이 없어요</p>';
   $('#home-emo').innerHTML = `<div class="card">
     <h2 style="margin:0">기분 × 카테고리</h2>
