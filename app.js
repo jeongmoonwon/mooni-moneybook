@@ -293,8 +293,8 @@ function renderHome() {
   const key = periodOfDate(today());
   ensureMonthBadges();
   renderStatus();
-  renderEmoGrid();
   renderHomeBadges();
+  renderEmoGrid();
 }
 // 기록 탭: 달력 + 고른 날의 내역, ＋로 기록
 function renderRecord() {
@@ -410,46 +410,7 @@ function earnedBadges() {
 function badgeHtml(b, p, small) {
   return `<span class="bd ${p.done ? 'full' : p.fill > 0 ? 'mid' : 'todo'}${small ? ' sm' : ''}" style="--c:${badgeColor(b)};--p:${Math.round(p.fill * 100)}%"><span>${badgeIcon(b)}</span></span>`;
 }
-/* ================= 돌아보기: 감정 지도 ================= */
-// 보고 있는 달 리뷰에서 고른 기분을 세서, 왼쪽은 만족 · 오른쪽은 후회 버블로. 자주 느낀 기분일수록 크게
-const EMO_W = 340, EMO_H = 236, EMO_TOP = 24;
-function packBubbles(items, x0, x1) { // 큰 것부터, 안 겹치면서 이쪽 가운데에 가장 가까운 자리에 둔다
-  const placed = [], cx = (x0 + x1) / 2, cy = (EMO_TOP + EMO_H) / 2;
-  for (const it of items) {
-    let best = null;
-    for (let x = x0 + it.r; x <= x1 - it.r; x += 3) for (let y = EMO_TOP + it.r; y <= EMO_H - it.r; y += 3) {
-      if (placed.some(p => Math.hypot(p.x - x, p.y - y) < p.r + it.r + 3)) continue;
-      const d = Math.hypot(x - cx, (y - cy) * 1.3);
-      if (!best || d < best.d) best = { x, y, d };
-    }
-    if (best) placed.push({ ...it, x: best.x, y: best.y });
-  }
-  return placed;
-}
-function emoMapHtml(spent) {
-  const exp = spent.filter(e => e.mood && withMood(e.feel));
-  const count = feel => { const c = new Map(); for (const e of exp) if (e.feel === feel) c.set(e.mood, (c.get(e.mood) || 0) + 1);
-    return [...c].sort((a, b) => b[1] - a[1]).slice(0, 6); }; // 한쪽에 6개까지 (많으면 작은 원이 들어갈 자리가 없어서)
-  const good = count('만족'), bad = count('후회'), max = Math.max(1, ...[...good, ...bad].map(x => x[1]));
-  const size = list => list.map(([t, n]) => ({ t, n, ic: moodIcon(t), r: 15 + 24 * Math.sqrt(n / max) }));
-  const half = EMO_W / 2;
-  const bubble = (b, cls) => { const big = b.r >= 32, mid = b.r >= 25;
-    return `<g class="${cls}"><circle cx="${b.x.toFixed(1)}" cy="${b.y.toFixed(1)}" r="${b.r.toFixed(1)}"/>
-      <text x="${b.x.toFixed(1)}" y="${(b.y + (mid ? -b.r * 0.18 : 5)).toFixed(1)}" font-size="${(b.r * 0.55).toFixed(1)}" class="ic">${b.ic}</text>
-      ${mid ? `<text x="${b.x.toFixed(1)}" y="${(b.y + b.r * 0.38).toFixed(1)}" font-size="${big ? 11 : 9.5}">${esc(b.t.length > 7 ? b.t.slice(0, 6) + '…' : b.t)}${big ? ` ${b.n}` : ''}</text>` : ''}
-      <title>${esc(b.t)} ${b.n}번</title></g>`; };
-  return `<div class="emo"><p class="lb-sub">감정 지도 <small>${exp.length ? `기분 ${exp.length}개 · 클수록 자주 느낀 기분` : '리뷰할 때 그때 기분을 고르면 여기에 모여요'}</small></p>
-    ${exp.length ? `<svg viewBox="0 0 ${EMO_W} ${EMO_H}" role="img" aria-label="만족할 때 기분 ${good.map(([t, n]) => `${t} ${n}번`).join(', ') || '없음'}, 후회할 때 기분 ${bad.map(([t, n]) => `${t} ${n}번`).join(', ') || '없음'}">
-      <line x1="${half}" y1="6" x2="${half}" y2="${EMO_H - 4}" class="mid"/>
-      <text x="4" y="14" class="side good">😊 만족 ${exp.filter(e => e.feel === '만족').length}</text>
-      <text x="${EMO_W - 4}" y="14" class="side bad">후회 ${exp.filter(e => e.feel === '후회').length} 😣</text>
-      ${packBubbles(size(good), 2, half - 4).map(b => bubble(b, 'good')).join('')}
-      ${packBubbles(size(bad), half + 4, EMO_W - 2).map(b => bubble(b, 'bad')).join('')}
-      ${good.length ? '' : `<text x="${half / 2}" y="${EMO_H / 2}" class="none">아직 없어요</text>`}${bad.length ? '' : `<text x="${half * 1.5}" y="${EMO_H / 2}" class="none">아직 없어요</text>`}
-    </svg>` : ''}</div>`;
-}
-
-/* ================= 홈: 기분 × 카테고리 (언제 무엇을 샀는지) ================= */
+/* ================= 홈: 마음 지도 (어떤 기분일 때 어디에 썼는지 · 기분 × 카테고리) ================= */
 // 기간은 추이 탭처럼 고른다: 이번 달 · 최근 1년 · 전체 · 직접 선택. 이 기기에 기억
 function savedEmoRange() {
   try { const r = JSON.parse(localStorage.getItem('emoRange') || 'null'); if (r && ['month', 'year', 'all', 'custom'].includes(r.range)) return r; } catch { /* 무시 */ }
@@ -488,7 +449,7 @@ function renderEmoGrid() {
       top.후회 && `가장 후회한 조합 · <b>${moodIcon(top.후회.m)} ${esc(top.후회.m)} × ${esc(top.후회.c)}</b>`].filter(Boolean).join('<br>')}</span></div>`
     : '<p class="empty" style="padding:8px 0">이 기간에 리뷰하며 고른 기분이 없어요</p>';
   $('#home-emo').innerHTML = `<div class="card">
-    <h2 style="margin:0">기분 × 카테고리</h2>
+    <h2 style="margin:0">💗 마음 지도</h2><p class="label" style="margin:2px 0 0">어떤 기분일 때 어디에 썼는지</p>
     <button class="range-btn" data-emorangetoggle aria-expanded="${!!state.emoRangeOpen}">${{ month: '이번 달', year: '최근 1년', all: '전체', custom: '직접 선택' }[R.range]} · ${a === b ? ym(a) : `${fmt(a)} ~ ${fmt(b)}`} · 기분 ${exp.length}개 <i>${state.emoRangeOpen ? '▴' : '▾'}</i></button>
     ${state.emoRangeOpen ? `<div class="range-panel"><div class="seg">${[['month', '이번 달'], ['year', '최근 1년'], ['all', '전체'], ['custom', '직접 선택']]
       .map(([v, t]) => `<button data-emorange="${v}" aria-pressed="${v === R.range}">${t}</button>`).join('')}</div>
@@ -1056,7 +1017,7 @@ function renderMonth() {
 }
 
 // 소비 만족도: 리뷰한 지출 중 만족 · 후회 금액끼리 비율(필수는 빼고 금액만). 후회한 소비는 큰 순서로
-// 돌아보기: 만족 · 후회 비율(금액 기준), 참음, 받은 배지, 감정 지도. 만족 · 참음 · 후회 칸을 누르면 그 목록이 펼쳐짐
+// 돌아보기: 만족 · 후회 비율(금액 기준), 참음, 받은 배지. 만족 · 참음 · 후회 칸을 누르면 그 목록이 펼쳐짐
 function renderLookback(exp, held, key) {
   const done = exp.filter(e => FEELS[e.feel]), total = done.reduce((s, e) => s + e.amount, 0), sat = satRate(done);
   const byAmt = f => done.filter(e => e.feel === f).sort((a, b) => b.amount - a.amount);
@@ -1080,7 +1041,7 @@ function renderLookback(exp, held, key) {
     <div class="lb-nums">${tile('good', 'lb-sat', sat != null ? sat + '%' : '–', `😊 만족 ${good.length}개`)}${tile('held', 'lb-held', `${held.length}번`, `🙌 참음${saved ? ` ${compact(saved)}` : ''}`)}${tile('regret', 'lb-reg', sat != null ? 100 - sat + '%' : '–', `😣 후회 ${regret.length}개`)}
       <div class="lb-badge"><b>${badges.length ? `${got}/${badges.length}` : '–'}</b><small>🏅 배지</small></div></div>
     ${panel ? `<div class="lb-panel"><p>${panel[0]}</p>${panel[1].length ? `<ul class="list">${panel[1].map(panel[2]).join('')}</ul>` : `<p class="empty" style="padding:4px 0">${panel[3]}</p>`}</div>` : ''}
-    ${emoMapHtml(exp)}`;
+`;
 }
 
 // 카테고리별 예산: 달마다 정한다. 전체 예산을 정하면 모든 카테고리에 똑같이 나눠 넣고(openBudget),
