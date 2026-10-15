@@ -956,28 +956,28 @@ function renderMonth() {
 }
 
 // 소비 만족도: 리뷰한 지출 중 만족 · 후회 금액끼리 비율(필수는 빼고 금액만). 후회한 소비는 큰 순서로
-// 돌아보기: 만족 · 후회 비율(금액 기준), 필수 금액, 받은 배지, 후회할 때 가장 많았던 기분. 후회 · 참음 칸을 누르면 그 목록이 펼쳐짐
+// 돌아보기: 만족 · 후회 비율(금액 기준), 참음, 받은 배지, 후회할 때 가장 많았던 기분. 만족 · 참음 · 후회 칸을 누르면 그 목록이 펼쳐짐
 function renderLookback(exp, held, key) {
-  const done = exp.filter(e => FEELS[e.feel]), total = done.reduce((s, e) => s + e.amount, 0);
-  const by = sumBy(done, e => e.feel), sat = satRate(done);
-  const regret = done.filter(e => e.feel === '후회').sort((a, b) => b.amount - a.amount);
+  const done = exp.filter(e => FEELS[e.feel]), total = done.reduce((s, e) => s + e.amount, 0), sat = satRate(done);
+  const byAmt = f => done.filter(e => e.feel === f).sort((a, b) => b.amount - a.amount);
+  const good = byAmt('만족'), regret = byAmt('후회');
   const moods = new Map(); for (const e of regret) if (e.mood) moods.set(e.mood, (moods.get(e.mood) || 0) + 1);
   const topMood = [...moods].sort((a, b) => b[1] - a[1])[0], moodIc = moodIcon;
   const saved = held.reduce((s, h) => s + h.amount, 0), open = state.lookOpen;
   const badges = badgesOf(key), got = badges.filter(b => badgeProgress(b, key).done).length;
-  const regretItem = e => itemHtml(e).replace('</div></div>', `${e.mood ? ` <span class="cat">· ${moodIc(e.mood)} ${esc(e.mood)}</span>` : ''}${e.feelMemo ? `<div class="cat">“${esc(e.feelMemo)}”</div>` : ''}</div></div>`);
+  const feelItem = e => itemHtml(e).replace('</div></div>', `${e.mood ? ` <span class="cat">· ${moodIc(e.mood)} ${esc(e.mood)}</span>` : ''}${e.feelMemo ? `<div class="cat">“${esc(e.feelMemo)}”</div>` : ''}</div></div>`);
   const heldList = held.slice().sort((a, b) => b.date.localeCompare(a.date));
+  // 순서는 홈 상태 카드와 같게: 만족 · 참음 · 후회 (누르면 아래에 그 목록), 그 뒤 배지
   const tile = (k, cls, num, label) => `<button class="lb-tap ${cls}" data-lookfold="${k}" aria-expanded="${open === k}"><b>${num}</b><small>${label} ${open === k ? '▴' : '▾'}</small></button>`;
-  const panel = open === 'regret' ? [`😣 후회한 소비 ${regret.length}개`, regret, regretItem, '후회한 소비가 없어요']
-    : open === 'held' ? [`🙌 참은 소비 ${held.length}개${saved ? ` · ${won(saved)} 아낌` : ''}`, heldList, heldItemHtml, '사려다 참은 게 있으면 홈에서 기록해 보세요'] : null;
+  const panel = open === 'good' ? [`😊 만족한 소비 ${good.length}개`, good, feelItem, '만족한 소비가 없어요']
+    : open === 'held' ? [`🙌 참은 소비 ${held.length}개${saved ? ` · ${won(saved)} 아낌` : ''}`, heldList, heldItemHtml, '사려다 참은 게 있으면 홈에서 기록해 보세요']
+    : open === 'regret' ? [`😣 후회한 소비 ${regret.length}개`, regret, feelItem, '후회한 소비가 없어요'] : null;
   $('#lookback').innerHTML = `<h2 style="margin-bottom:2px">돌아보기</h2>
     <p class="label">${done.length ? `리뷰한 지출 ${done.length}건 · ${won(total)} 기준` : `아직 리뷰한 소비가 없어요 · ${won(reviewCfg().min)} 이상 지출을 ${reviewCfg().days}일 뒤 물어봐요`}</p>
-    <div class="lb-nums"><div><b>${sat != null ? sat + '%' : '–'}</b><small>😊 만족</small></div><div><b>${by.get('필수') ? compact(by.get('필수')) : '–'}</b><small>🧾 필수</small></div>
-      ${tile('regret', 'warn', sat != null ? 100 - sat + '%' : '–', `😣 후회 ${regret.length}개`)}${tile('held', 'held', `${held.length}번`, `🙌 참음${saved ? ` ${compact(saved)}` : ''}`)}</div>
+    <div class="lb-nums">${tile('good', 'lb-sat', sat != null ? sat + '%' : '–', `😊 만족 ${good.length}개`)}${tile('held', 'lb-held', `${held.length}번`, `🙌 참음${saved ? ` ${compact(saved)}` : ''}`)}${tile('regret', 'lb-reg', sat != null ? 100 - sat + '%' : '–', `😣 후회 ${regret.length}개`)}
+      <div class="lb-badge"><b>${badges.length ? `${got}/${badges.length}` : '–'}</b><small>🏅 배지</small></div></div>
     ${panel ? `<div class="lb-panel"><p>${panel[0]}</p>${panel[1].length ? `<ul class="list">${panel[1].map(panel[2]).join('')}</ul>` : `<p class="empty" style="padding:4px 0">${panel[3]}</p>`}</div>` : ''}
-    ${badges.length ? `<p class="lb-mood">🏅 이 달 배지 · <b>${got}/${badges.length}개</b> 받음</p>` : ''}
-    ${topMood ? `<p class="lb-mood">후회할 때 가장 많았던 기분 · <b>${moodIc(topMood[0])} ${esc(topMood[0])}</b> ${topMood[1]}번</p>` : ''}
-`;
+    ${topMood ? `<p class="lb-mood">후회할 때 가장 많았던 기분 · <b>${moodIc(topMood[0])} ${esc(topMood[0])}</b> ${topMood[1]}번</p>` : ''}`;
 }
 
 // 카테고리별 예산: 달마다 정한다. 전체 예산을 정하면 모든 카테고리에 똑같이 나눠 넣고(openBudget),

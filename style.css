@@ -565,15 +565,16 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 
 /* 한 달 탭: 돌아보기 */
 .lb-nums{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
-.lb-nums div{background:var(--page);border-radius:16px;padding:8px 2px;text-align:center}
+.lb-nums > *{border:1.5px solid transparent;border-radius:16px;padding:7px 2px;text-align:center;color:var(--t1);background:var(--page)}
 .lb-nums b{display:block;font-size:17px;font-family:var(--round),sans-serif}
-.lb-nums small{font-size:10px;color:var(--mu)}
-.lb-nums .warn b{color:var(--bad)}
-.lb-nums .held b{color:var(--t-strong)}
-#lookback{scroll-margin-top:70px} /* 홈 '자세히'로 올 때 위 머리글에 안 가리게 */
+.lb-nums small{font-size:10px;color:var(--t2)}
+/* 홈 상태 카드와 같은 색: 만족 초록 · 참음 파랑 · 후회 빨강 */
+.lb-nums .lb-sat{background:color-mix(in srgb,var(--good) 14%,var(--card))}.lb-nums .lb-sat b{color:var(--good)}
+.lb-nums .lb-held{background:color-mix(in srgb,var(--down) 14%,var(--card))}.lb-nums .lb-held b{color:var(--down)}
+.lb-nums .lb-reg{background:color-mix(in srgb,var(--bad) 12%,var(--card))}.lb-nums .lb-reg b{color:var(--bad)}
+.lb-nums .lb-badge b{color:var(--t-strong)}
+.lb-nums .lb-tap[aria-expanded=true]{border-color:var(--ink)}
 .lb-mood{margin:12px 0 0;font-size:14px;background:var(--wash);border-radius:14px;padding:9px 12px}
-.lb-nums .lb-tap{border:1.5px solid var(--border);background:var(--card);border-radius:16px;padding:7px 2px;text-align:center;color:var(--t1)}
-.lb-nums .lb-tap[aria-expanded=true]{border-color:var(--ink);background:var(--wash)}
 .lb-panel{margin-top:8px;border:1.5px solid var(--ink);border-radius:16px;padding:10px 12px 4px}
 .lb-panel > p{margin:0;font-size:14px;font-weight:700}
 
