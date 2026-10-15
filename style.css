@@ -576,16 +576,18 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 .lb-nums .lb-reg{background:color-mix(in srgb,var(--bad) 12%,var(--card))}.lb-nums .lb-reg b{color:var(--bad)}
 .lb-nums .lb-badge b{color:var(--t-strong)}
 .lb-nums .lb-tap[aria-expanded=true]{border-color:var(--ink)}
-/* 홈 마음 지도 (버블) */
-.emo svg{display:block;width:100%;height:auto}
-.emo text{text-anchor:middle;font-family:var(--round),var(--kfont),sans-serif}
+/* 홈 마음 지도 (비눗방울) */
+.emo svg{display:block;width:100%;height:auto;overflow:visible}
+.emo text{text-anchor:middle;font-family:var(--round),var(--kfont),sans-serif;pointer-events:none}
 .emo .ic{font-family:system-ui,sans-serif}
-.emo .mid{stroke:var(--border);stroke-width:1.5;stroke-dasharray:4 4}
 .emo .side{font-size:12px}.emo .side.good{fill:var(--good);text-anchor:start}.emo .side.bad{fill:var(--bad);text-anchor:end}
-.emo .good circle{fill:color-mix(in srgb,var(--good) 15%,var(--card));stroke:color-mix(in srgb,var(--good) 40%,transparent);stroke-width:1.5}
-.emo .bad circle{fill:color-mix(in srgb,var(--bad) 13%,var(--card));stroke:color-mix(in srgb,var(--bad) 40%,transparent);stroke-width:1.5}
+.emo .bub{cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none}
+.emo .bub.held{cursor:grabbing}
+.emo .bub .rim{fill:none;stroke-width:1.4}
+.emo .good .rim{stroke:color-mix(in srgb,var(--good) 55%,transparent)}.emo .bad .rim{stroke:color-mix(in srgb,var(--bad) 55%,transparent)}
+.emo .bub .shine{fill:#fff;opacity:.75;pointer-events:none}
+.emo .bub.held circle{filter:drop-shadow(0 4px 6px rgba(0,0,0,.12))}
 .emo .good text{fill:var(--good)}.emo .bad text{fill:var(--bad)}
-.emo .none{font-size:11px;fill:var(--mu)}
 .lb-panel{margin-top:8px;border:1.5px solid var(--ink);border-radius:16px;padding:10px 12px 4px}
 .lb-panel > p{margin:0;font-size:14px;font-weight:700}
 

@@ -422,7 +422,8 @@ function emoMonths() { // 기록이 있는 첫 달부터 이번 달까지
   for (let k = first; k <= cur; k = shiftPeriod(k, 1)) ks.push(k);
   return ks;
 }
-// 버블: 왼쪽 만족 · 오른쪽 후회. 자주 느낀 기분일수록 크게
+// 버블: 왼쪽 만족 · 오른쪽 후회. 개수가 많은 쪽이 더 넓게, 자주 느낀 기분일수록 크게.
+// 손가락으로 끌면 따라오고 다른 방울은 밀려나며, 놓으면 제자리로 둥실 돌아감. 톡 누르면 그 기분의 소비 목록
 const EMO_W = 340, EMO_H = 236, EMO_TOP = 24;
 function packBubbles(items, x0, x1) { // 큰 것부터, 안 겹치면서 이쪽 가운데에 가장 가까운 자리에 둔다
   const placed = [], cx = (x0 + x1) / 2, cy = (EMO_TOP + EMO_H) / 2;
@@ -441,22 +442,80 @@ function emoMapSvg(exp) {
   const count = feel => { const c = new Map(); for (const e of exp) if (e.feel === feel) c.set(e.mood, (c.get(e.mood) || 0) + 1);
     return [...c].sort((a, b) => b[1] - a[1]).slice(0, 6); }; // 한쪽에 6개까지 (많으면 작은 원이 들어갈 자리가 없어서)
   const good = count('만족'), bad = count('후회'), max = Math.max(1, ...[...good, ...bad].map(x => x[1]));
-  const size = list => list.map(([t, n]) => ({ t, n, ic: moodIcon(t), r: 15 + 24 * Math.sqrt(n / max) }));
-  const half = EMO_W / 2;
-  const bubble = (b, cls) => { const big = b.r >= 32, mid = b.r >= 25, label = big ? `${b.t} ${b.n}` : b.t;
+  const nG = exp.filter(e => e.feel === '만족').length, nB = exp.filter(e => e.feel === '후회').length;
+  // 나누는 자리: 개수 비율대로 (한쪽만 있으면 전부, 둘 다 있으면 한쪽이 너무 좁아지지 않게 30~70%)
+  const split = !nB ? EMO_W : !nG ? 0 : EMO_W * Math.min(0.7, Math.max(0.3, nG / (nG + nB)));
+  const size = (list, feel) => list.map(([t, n]) => ({ t, n, feel, ic: moodIcon(t), r: 15 + 24 * Math.sqrt(n / max) }));
+  const nodes = [...packBubbles(size(good, '만족'), 2, split - 3), ...packBubbles(size(bad, '후회'), split + 3, EMO_W - 2)];
+  state.emoNodes = nodes.map(n => ({ ...n, hx: n.x, hy: n.y, vx: 0, vy: 0 }));
+  const bubble = (b, i) => { const big = b.r >= 32, mid = b.r >= 25, label = big ? `${b.t} ${b.n}` : b.t, cls = b.feel === '만족' ? 'good' : 'bad';
     const fs = Math.min(big ? 11 : 9.5, b.r * 1.75 / label.length); // 이름이 길면 원 안에 들어가게 글자를 줄임
-    return `<g class="${cls}"><circle cx="${b.x.toFixed(1)}" cy="${b.y.toFixed(1)}" r="${b.r.toFixed(1)}"/>
-      <text x="${b.x.toFixed(1)}" y="${(b.y + (mid ? -b.r * 0.18 : 5)).toFixed(1)}" font-size="${(b.r * 0.55).toFixed(1)}" class="ic">${b.ic}</text>
-      ${mid ? `<text x="${b.x.toFixed(1)}" y="${(b.y + b.r * 0.38).toFixed(1)}" font-size="${fs.toFixed(1)}">${esc(label)}</text>` : ''}
-      <title>${esc(b.t)} ${b.n}번</title></g>`; };
-  return `<svg viewBox="0 0 ${EMO_W} ${EMO_H}" role="img" aria-label="만족할 때 기분 ${good.map(([t, n]) => `${t} ${n}번`).join(', ') || '없음'}, 후회할 때 기분 ${bad.map(([t, n]) => `${t} ${n}번`).join(', ') || '없음'}">
-    <line x1="${half}" y1="6" x2="${half}" y2="${EMO_H - 4}" class="mid"/>
-    <text x="4" y="14" class="side good">😊 만족 ${exp.filter(e => e.feel === '만족').length}</text>
-    <text x="${EMO_W - 4}" y="14" class="side bad">후회 ${exp.filter(e => e.feel === '후회').length} 😣</text>
-    ${packBubbles(size(good), 2, half - 4).map(b => bubble(b, 'good')).join('')}
-    ${packBubbles(size(bad), half + 4, EMO_W - 2).map(b => bubble(b, 'bad')).join('')}
-    ${good.length ? '' : `<text x="${half / 2}" y="${EMO_H / 2}" class="none">아직 없어요</text>`}${bad.length ? '' : `<text x="${half * 1.5}" y="${EMO_H / 2}" class="none">아직 없어요</text>`}
+    return `<g class="bub ${cls}" data-mi="${i}" transform="translate(${b.x.toFixed(1)} ${b.y.toFixed(1)})" role="button" aria-label="${esc(b.t)} ${b.n}번, 눌러서 목록 보기">
+      <circle r="${b.r.toFixed(1)}" fill="url(#soap-${cls})"/><circle r="${b.r.toFixed(1)}" class="rim"/>
+      <ellipse cx="${(-b.r * 0.38).toFixed(1)}" cy="${(-b.r * 0.45).toFixed(1)}" rx="${(b.r * 0.28).toFixed(1)}" ry="${(b.r * 0.16).toFixed(1)}" transform="rotate(-35 ${(-b.r * 0.38).toFixed(1)} ${(-b.r * 0.45).toFixed(1)})" class="shine"/>
+      <circle cx="${(-b.r * 0.12).toFixed(1)}" cy="${(-b.r * 0.66).toFixed(1)}" r="${(b.r * 0.06).toFixed(1)}" class="shine"/>
+      <text y="${(mid ? -b.r * 0.18 : 5).toFixed(1)}" font-size="${(b.r * 0.55).toFixed(1)}" class="ic">${b.ic}</text>
+      ${mid ? `<text y="${(b.r * 0.38).toFixed(1)}" font-size="${fs.toFixed(1)}">${esc(label)}</text>` : ''}</g>`; };
+  const soap = (id, c) => `<radialGradient id="soap-${id}" cx="50%" cy="50%" r="50%">
+    <stop offset="0" stop-color="${c}" stop-opacity=".04"/><stop offset=".62" stop-color="${c}" stop-opacity=".10"/>
+    <stop offset=".88" stop-color="${c}" stop-opacity=".30"/><stop offset="1" stop-color="${c}" stop-opacity=".55"/></radialGradient>`;
+  return `<svg viewBox="0 0 ${EMO_W} ${EMO_H}" class="emo-svg" role="img" aria-label="만족할 때 기분 ${good.map(([t, n]) => `${t} ${n}번`).join(', ') || '없음'}, 후회할 때 기분 ${bad.map(([t, n]) => `${t} ${n}번`).join(', ') || '없음'}">
+    <defs>${soap('good', '#36A66B')}${soap('bad', '#E5534B')}</defs>
+    ${nG ? `<text x="4" y="14" class="side good">😊 만족 ${nG}</text>` : ''}${nB ? `<text x="${EMO_W - 4}" y="14" class="side bad">후회 ${nB} 😣</text>` : ''}
+    ${nodes.map(bubble).join('')}
   </svg>`;
+}
+// 끌기: 잡은 방울은 손가락을 따라가고, 겹친 방울은 밀어내고, 나머지는 제자리로 살살 당겨짐
+function emoStep() {
+  const N = state.emoNodes, svg = $('#home-emo .emo-svg'); if (!N || !svg) return (state.emoAnim = 0);
+  const drag = state.emoDrag; let moving = false;
+  for (const n of N) if (n !== (drag && drag.node)) { n.vx = (n.vx + (n.hx - n.x) * 0.03) * 0.82; n.vy = (n.vy + (n.hy - n.y) * 0.03) * 0.82; n.x += n.vx; n.y += n.vy; }
+  for (let k = 0; k < 3; k++) for (let i = 0; i < N.length; i++) for (let j = i + 1; j < N.length; j++) {
+    const a = N[i], b = N[j], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 0.01, o = a.r + b.r + 2 - d;
+    if (o <= 0) continue;
+    const ux = dx / d, uy = dy / d, aFix = drag && drag.node === a, bFix = drag && drag.node === b;
+    const sa = aFix ? 0 : bFix ? 1 : 0.5, sb = bFix ? 0 : aFix ? 1 : 0.5;
+    a.x -= ux * o * sa; a.y -= uy * o * sa; b.x += ux * o * sb; b.y += uy * o * sb;
+  }
+  N.forEach((n, i) => {
+    n.x = Math.min(EMO_W - n.r, Math.max(n.r, n.x)); n.y = Math.min(EMO_H - n.r, Math.max(EMO_TOP - 6 + n.r, n.y));
+    if (Math.abs(n.vx) + Math.abs(n.vy) > 0.05 || Math.hypot(n.x - n.hx, n.y - n.hy) > 0.5) moving = true;
+    const g = svg.querySelector(`[data-mi="${i}"]`); if (g) g.setAttribute('transform', `translate(${n.x.toFixed(1)} ${n.y.toFixed(1)})`);
+  });
+  state.emoAnim = moving || drag ? requestAnimationFrame(emoStep) : 0;
+}
+const emoKick = () => { if (!state.emoAnim) state.emoAnim = requestAnimationFrame(emoStep); };
+function emoPoint(svg, ev) { const p = svg.createSVGPoint(); p.x = ev.clientX; p.y = ev.clientY; return p.matrixTransform(svg.getScreenCTM().inverse()); }
+function initEmoDrag() {
+  const box = $('#home-emo');
+  box.addEventListener('pointerdown', ev => {
+    const g = ev.target.closest('[data-mi]'), svg = g && g.ownerSVGElement; if (!g) return;
+    const node = state.emoNodes[g.dataset.mi], p = emoPoint(svg, ev);
+    state.emoDrag = { node, svg, id: ev.pointerId, sx: ev.clientX, sy: ev.clientY, ox: p.x - node.x, oy: p.y - node.y, moved: false };
+    try { g.setPointerCapture(ev.pointerId); } catch { /* 일부 브라우저 */ } g.classList.add('held'); emoKick();
+  });
+  box.addEventListener('pointermove', ev => {
+    const D = state.emoDrag; if (!D || D.id !== ev.pointerId) return;
+    if (!D.moved && Math.hypot(ev.clientX - D.sx, ev.clientY - D.sy) < 6) return; // 살짝 흔들린 건 '톡'으로
+    D.moved = true;
+    const p = emoPoint(D.svg, ev); D.node.x = p.x - D.ox; D.node.y = p.y - D.oy; D.node.vx = D.node.vy = 0;
+  });
+  const end = ev => {
+    const D = state.emoDrag; if (!D || D.id !== ev.pointerId) return;
+    state.emoDrag = null; box.querySelectorAll('.held').forEach(g => g.classList.remove('held')); emoKick();
+    if (!D.moved && ev.type === 'pointerup') openMoodList(D.node.feel, D.node.t);
+  };
+  box.addEventListener('pointerup', end); box.addEventListener('pointercancel', end);
+  box.addEventListener('touchmove', ev => { if (state.emoDrag) ev.preventDefault(); }, { passive: false }); // 끄는 동안 화면이 스크롤되지 않게
+}
+// 방울을 톡 누르면: 고른 기간에 그 기분으로 리뷰한 소비 목록 (최근 것부터)
+function openMoodList(feel, mood) {
+  const [a, b] = state.emoSpan, list = state.entries.filter(e => e.type === '지출' && e.feel === feel && e.mood === mood && periodOf(e) >= a && periodOf(e) <= b)
+    .sort((x, y) => y.date.localeCompare(x.date));
+  $('#mood-pop-title').textContent = `${moodIcon(mood)} ${mood}`;
+  $('#mood-pop-sub').textContent = `${feel === '만족' ? '😊 만족' : '😣 후회'} ${list.length}개 · ${won(list.reduce((s, e) => s + e.amount, 0))} · ${state.emoSpanLabel}`;
+  $('#mood-pop-list').innerHTML = list.map(feelItem).join('') || '<li class="empty">없어요</li>';
+  $('#mood-pop').showModal(); document.activeElement.blur();
 }
 function renderEmoMap() {
   const R = state.emoRange || (state.emoRange = savedEmoRange()), ks = emoMonths();
@@ -465,8 +524,9 @@ function renderEmoMap() {
     : R.range === 'year' ? [ks[Math.max(0, ks.length - 12)], ks.at(-1)] : [R.from, R.to].sort();
   const fmt = k => `${k.slice(2, 4)}.${Number(k.slice(5))}`, ym = k => `${k.slice(0, 4)}년 ${Number(k.slice(5))}월`;
   const exp = state.entries.filter(e => e.type === '지출' && e.mood && withMood(e.feel) && periodOf(e) >= a && periodOf(e) <= b);
+  state.emoSpan = [a, b]; state.emoSpanLabel = a === b ? ym(a) : `${ym(a)} ~ ${ym(b)}`;
   $('#home-emo').innerHTML = `<div class="card emo">
-    <h2 style="margin:0">💗 마음 지도</h2><p class="label" style="margin:2px 0 0">리뷰할 때 고른 기분 · 클수록 자주 느낀 기분</p>
+    <h2 style="margin:0">💗 마음 지도</h2><p class="label" style="margin:2px 0 0">클수록 자주 느낀 기분 · 끌어 보고, 톡 누르면 목록</p>
     <button class="range-btn" data-emorangetoggle aria-expanded="${!!state.emoRangeOpen}">${{ month: '이번 달', year: '최근 1년', all: '전체', custom: '직접 선택' }[R.range]} · ${a === b ? ym(a) : `${fmt(a)} ~ ${fmt(b)}`} · 기분 ${exp.length}개 <i>${state.emoRangeOpen ? '▴' : '▾'}</i></button>
     ${state.emoRangeOpen ? `<div class="range-panel"><div class="seg">${[['month', '이번 달'], ['year', '최근 1년'], ['all', '전체'], ['custom', '직접 선택']]
       .map(([v, t]) => `<button data-emorange="${v}" aria-pressed="${v === R.range}">${t}</button>`).join('')}</div>
@@ -1035,16 +1095,18 @@ function renderMonth() {
 
 // 소비 만족도: 리뷰한 지출 중 만족 · 후회 금액끼리 비율(필수는 빼고 금액만). 후회한 소비는 큰 순서로
 // 돌아보기: 만족 · 후회 비율(금액 기준), 참음, 받은 배지. 만족 · 참음 · 후회 칸을 누르면 그 목록이 펼쳐짐
+// 돌아보기 · 마음 지도 목록: 종류 · 이모지 없이 날짜 · 카테고리(· 그때 기분)와 내용만
+function feelItem(e) {
+  return `<li class="item" data-id="${esc(e.id)}"><div class="main"><div class="cat">${md(e.date)} · ${esc(e.category)}${e.mood ? ` · ${esc(e.mood)}` : ''}</div>
+    <div class="det">${esc(e.detail || '—')}${e.memo ? ` <span class="cat">· ${esc(e.memo)}</span>` : ''}</div>${e.feelMemo ? `<div class="cat">“${esc(e.feelMemo)}”</div>` : ''}</div>
+    <div class="amt num">${won(e.amount)}</div></li>`;
+}
 function renderLookback(exp, held, key) {
   const done = exp.filter(e => FEELS[e.feel]), total = done.reduce((s, e) => s + e.amount, 0), sat = satRate(done);
   const byAmt = f => done.filter(e => e.feel === f).sort((a, b) => b.amount - a.amount);
   const good = byAmt('만족'), regret = byAmt('후회');
   const saved = held.reduce((s, h) => s + h.amount, 0), open = state.lookOpen;
   const badges = badgesOf(key), got = badges.filter(b => badgeProgress(b, key).done).length;
-  // 펼친 목록은 종류 · 이모지 없이 날짜 · 카테고리(· 그때 기분)와 내용만
-  const feelItem = e => `<li class="item" data-id="${esc(e.id)}"><div class="main"><div class="cat">${md(e.date)} · ${esc(e.category)}${e.mood ? ` · ${esc(e.mood)}` : ''}</div>
-    <div class="det">${esc(e.detail || '—')}${e.memo ? ` <span class="cat">· ${esc(e.memo)}</span>` : ''}</div>${e.feelMemo ? `<div class="cat">“${esc(e.feelMemo)}”</div>` : ''}</div>
-    <div class="amt num">${won(e.amount)}</div></li>`;
   const heldItem = h => `<li class="item" data-held="${esc(h.id)}"><div class="main"><div class="cat">${md(h.date)}${h.category ? ` · ${esc(h.category)}` : ''}${h.memo ? ` · ${esc(h.memo)}` : ''}</div>
     <div class="det">${esc(h.detail)}</div></div><div class="amt num saved">${h.amount ? won(h.amount) + ' 아낌' : ''}</div></li>`;
   const heldList = held.slice().sort((a, b) => b.date.localeCompare(a.date));
@@ -1840,6 +1902,7 @@ async function importCsv(file) {
 addEventListener('resize', () => { if (state.view === 'trend') renderTrend(); }); // 화면 폭이 바뀌면 그래프 폭도 다시 맞춤
 document.querySelectorAll('dialog').forEach(dl => dl.addEventListener('click', ev => { if (ev.target === dl) dl.close(); })); // 바깥 누르면 닫기
 $('#entry-sheet').addEventListener('close', () => { state.editing = null; });
+initEmoDrag();
 $('#home-emo').addEventListener('change', ev => {
   if (ev.target.id === 'eg-from') state.emoRange.from = ev.target.value;
   if (ev.target.id === 'eg-to') state.emoRange.to = ev.target.value;
@@ -1925,7 +1988,7 @@ document.addEventListener('click', ev => {
   if (d.gomonth) { state.period = d.gomonth; state.calDay = null; return go('month'); }
   if (d.day) { state.calDay = state.calDay === d.day ? null : d.day; return renderCalendar(); }
   if (d.jump) { [state.fltType, state.fltCat] = d.jump.split('|'); state.q = ''; $('#flt-q').value = ''; return go('list'); }
-  if (d.id) return startEdit(d.id);
+  if (d.id) { if ($('#mood-pop').open) $('#mood-pop').close(); return startEdit(d.id); }
   if (d.close !== undefined) return b.closest('dialog').close();
   if (d.cetype) { state.ceType = d.cetype; state.ceDelete = null; return renderCats(); }
   if (d.cedel) return deleteCat(d.cedel);
