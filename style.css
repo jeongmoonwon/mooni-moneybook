@@ -380,6 +380,8 @@ body.demo .demo-banner{display:block}
 .range-btn[aria-expanded=true]{color:var(--t-strong);font-weight:700}
 .range-panel{background:var(--wash);border-radius:14px;padding:8px;margin:2px 0 8px}
 .range-panel .seg{background:var(--card);padding:3px}
+.range-panel .seg button{font-size:13px;padding:7px 0}
+.range-panel .range-pick select{font-size:13px}
 #trend-range .seg button{padding:7px 0;font-size:13px}
 .range-panel .seg button[aria-pressed=true]{background:var(--ink);color:var(--on-ink);box-shadow:none}
 .range-pick{display:flex;align-items:center;gap:8px;margin-top:8px}
@@ -574,17 +576,16 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 .lb-nums .lb-reg{background:color-mix(in srgb,var(--bad) 12%,var(--card))}.lb-nums .lb-reg b{color:var(--bad)}
 .lb-nums .lb-badge b{color:var(--t-strong)}
 .lb-nums .lb-tap[aria-expanded=true]{border-color:var(--ink)}
-/* 홈 마음 지도 (기분 × 카테고리) */
-.eg{display:grid;gap:4px;font-size:11.5px;align-items:center;margin-top:6px}
-.eg-h{text-align:center;color:var(--mu);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.eg-group{font-size:12px;font-weight:700;margin-top:6px}.eg-group.good{color:var(--good)}.eg-group.bad{color:var(--bad)}
-.eg-row{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--t1)}
-.eg-cell{height:30px;border-radius:8px;display:grid;place-items:center;font-family:var(--round),sans-serif;background:var(--page)}
-.eg-cell.good{background:color-mix(in srgb,var(--good) var(--p),var(--page));color:var(--good)}
-.eg-cell.bad{background:color-mix(in srgb,var(--bad) var(--p),var(--page));color:var(--bad)}
-.eg-cell[data-strong]{color:#fff}
-.eg-sum{display:flex;gap:10px;align-items:center;background:var(--wash);border-radius:14px;padding:8px 10px;margin-top:12px;font-size:12.5px;line-height:1.5}
-.eg-sum img{width:40px;height:40px;border-radius:12px;flex:none}
+/* 홈 마음 지도 (버블) */
+.emo svg{display:block;width:100%;height:auto}
+.emo text{text-anchor:middle;font-family:var(--round),var(--kfont),sans-serif}
+.emo .ic{font-family:system-ui,sans-serif}
+.emo .mid{stroke:var(--border);stroke-width:1.5;stroke-dasharray:4 4}
+.emo .side{font-size:12px}.emo .side.good{fill:var(--good);text-anchor:start}.emo .side.bad{fill:var(--bad);text-anchor:end}
+.emo .good circle{fill:color-mix(in srgb,var(--good) 15%,var(--card));stroke:color-mix(in srgb,var(--good) 40%,transparent);stroke-width:1.5}
+.emo .bad circle{fill:color-mix(in srgb,var(--bad) 13%,var(--card));stroke:color-mix(in srgb,var(--bad) 40%,transparent);stroke-width:1.5}
+.emo .good text{fill:var(--good)}.emo .bad text{fill:var(--bad)}
+.emo .none{font-size:11px;fill:var(--mu)}
 .lb-panel{margin-top:8px;border:1.5px solid var(--ink);border-radius:16px;padding:10px 12px 4px}
 .lb-panel > p{margin:0;font-size:14px;font-weight:700}
 
