@@ -52,6 +52,10 @@
     <div id="home-recap"></div>
     <div id="home-status"></div>
     <div id="home-badges"></div>
+  </section>
+
+  <!-- 기록 (달력) -->
+  <section class="view" id="view-record">
     <div class="card">
       <div class="period cal-nav" data-period-nav></div>
       <div class="cal-sum" id="cal-sum"></div>
@@ -59,6 +63,9 @@
       <div class="cal-legend" id="cal-legend"></div>
       <div id="cal-list"></div>
     </div>
+    <button class="fab" id="open-entry" aria-label="기록 추가">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
   </section>
 
   <!-- 한 달 -->
@@ -114,7 +121,7 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/></svg>홈</button>
   <button role="tab" data-view="month" aria-selected="false">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="12" width="3.5" height="8" rx="1"/><rect x="10.25" y="7" width="3.5" height="13" rx="1"/><rect x="16.5" y="4" width="3.5" height="16" rx="1"/></svg>한 달</button>
-  <button class="tab-add" id="open-entry" aria-label="기록 추가"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></i>기록</button>
+  <button role="tab" class="tab-rec" data-view="record" aria-selected="false"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5.5" width="16" height="14.5" rx="3"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/><path d="M12 13v4M10 15h4"/></svg></i>기록</button>
   <button role="tab" data-view="list" aria-selected="false">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>내역</button>
   <button role="tab" data-view="trend" aria-selected="false">

@@ -53,7 +53,7 @@ function loadHolidays(y) {
     const days = Object.fromEntries(Object.entries(json).map(([d, names]) => [d, names.join(' · ')]));
     holidays[y] = days;
     try { localStorage.setItem('holidays-' + y, JSON.stringify({ at: Date.now(), days })); } catch { /* 무시 */ }
-    if (state.view === 'home') renderCalendar();
+    if (state.view === 'record') renderCalendar();
   }).catch(() => { /* 오프라인이면 저장해 둔 것(또는 일요일만)으로 표시 */ });
 }
 function holidayName(s) { const y = s.slice(0, 4); loadHolidays(y); return (holidays[y] || {})[s] || ''; }
@@ -222,7 +222,7 @@ function resetForm() {
   renderForm();
 }
 
-// 새 기록: 홈에서 고른 날짜(또는 달력에서 고른 날짜)로 기록하기 창을 연다
+// 새 기록: 기록 탭에서 고른 날짜(또는 달력에서 고른 날짜)로 기록하기 창을 연다
 function openEntry(day) {
   state.date = day || state.calDay || today();
   resetForm();
@@ -289,13 +289,15 @@ function renderHome() {
   ensureMonthBadges();
   renderStatus();
   renderHomeBadges();
-
+}
+// 기록 탭: 달력 + 고른 날의 내역, ＋로 기록
+function renderRecord() {
   renderPeriodNav();
   renderCalSum();
   renderCalendar();
 }
 
-// 홈 달력 위: 보고 있는 달의 수입·지출 합계 (이번 달이면 오늘까지)
+// 기록 탭 달력 위: 보고 있는 달의 수입·지출 합계 (이번 달이면 오늘까지)
 function renderCalSum() {
   const { start, end } = periodRange(state.period), t = today(), live = t >= start && t <= end;
   const list = state.entries.filter(e => e.date >= start && e.date <= (live ? t : end));
@@ -1492,6 +1494,7 @@ function refreshAll() {
   renderTitle();
   if ($('#entry-sheet').open) renderForm();
   if (state.view === 'home') renderHome();
+  if (state.view === 'record') renderRecord();
   if (state.view === 'month') renderMonth();
   if (state.view === 'list') renderList();
   if (state.view === 'trend') renderTrend();
@@ -1931,7 +1934,7 @@ createStore().then(s => {
     if (!user) { state.entries = []; state.visible = []; state.editing = null; return; }
     if (!state.period) state.period = periodOfDate(today());
     store.listen(onData);
-    go(hash.get('tab') && hash.get('tab') !== 'add' ? hash.get('tab') : 'home');
+    go(hash.get('tab') && hash.get('tab') !== 'add' ? hash.get('tab') : hash.get('day') ? 'record' : 'home');
     if (hash.get('day')) { state.calDay = hash.get('day'); refreshAll(); }
   });
 }).catch(err => {

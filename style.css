@@ -277,12 +277,12 @@ nav.tabs button{border:0;background:none;padding:10px 0 12px;font-size:12px;colo
 nav.tabs button[aria-selected=true]{color:var(--t-strong);font-weight:700}
 nav.tabs button[aria-selected=true] svg{background:var(--wash);border-radius:10px;padding:2px;box-sizing:content-box}
 nav.tabs svg{width:22px;height:22px}
-/* 가운데 기록 버튼: 어느 탭에서든 바로 기록 */
-nav.tabs .tab-add{color:var(--t-strong);font-weight:700}
-nav.tabs .tab-add i{display:grid;place-items:center;width:52px;height:52px;margin:-26px 0 -2px;border-radius:50%;border:4px solid var(--card);
+/* 가운데 기록 탭 (달력): 동그랗게 튀어나온 버튼 */
+nav.tabs .tab-rec i{display:grid;place-items:center;width:52px;height:52px;margin:-26px 0 -2px;border-radius:50%;border:4px solid var(--card);
   background:linear-gradient(180deg,var(--ink),var(--ink-2));color:var(--on-ink);box-shadow:0 6px 14px color-mix(in srgb,var(--ink) 40%,transparent)}
-nav.tabs .tab-add svg{width:24px;height:24px}
-nav.tabs .tab-add:active i{transform:scale(.92)}
+nav.tabs .tab-rec svg,nav.tabs .tab-rec[aria-selected=true] svg{width:24px;height:24px;background:none;padding:0}
+nav.tabs .tab-rec[aria-selected=true] i{box-shadow:0 0 0 3px color-mix(in srgb,var(--ink) 35%,transparent),0 6px 14px color-mix(in srgb,var(--ink) 40%,transparent)}
+nav.tabs .tab-rec:active i{transform:scale(.92)}
 
 .view{display:none}.view.on{display:block}
 
@@ -411,6 +411,9 @@ body.demo .demo-banner{display:block}
 .held-card b{display:block;font-size:14px}
 .held-card small{display:block;font-size:12px;color:var(--mu)}
 .held-card .chip{margin-left:auto;white-space:nowrap;font-weight:700;color:var(--t-strong)}
+.fab{position:fixed;right:max(16px,calc(50% - 244px));bottom:calc(84px + env(safe-area-inset-bottom));z-index:6;width:58px;height:58px;border:0;border-radius:50%;
+  background:linear-gradient(180deg,var(--ink),var(--ink-2));color:var(--on-ink);display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(255,122,89,.45)}
+#view-record{padding-bottom:70px}
 .held-ic{font-size:16px;width:10px;display:flex;justify-content:center}
 .amt.saved{color:var(--t-strong);font-size:13px}
 
@@ -453,8 +456,8 @@ body{background-image:radial-gradient(color-mix(in srgb,var(--ink) 13%,transpare
 h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-card b,.held-card b{font-family:var(--round),var(--kfont),"Apple SD Gothic Neo",sans-serif;font-weight:400;letter-spacing:0}
 .btn{border-radius:18px}
 .btn.primary{box-shadow:0 4px 0 color-mix(in srgb,var(--ink) 60%,#000)}
-:is(.btn,.chip,.seg button,.step,.cal button,.item):active{transform:scale(.94)}
-:is(.btn,.chip,.seg button,.step,.cal button,.item){transition:transform .12s cubic-bezier(.3,1.6,.5,1)}
+:is(.btn,.chip,.seg button,.step,.fab,.cal button,.item):active{transform:scale(.94)}
+:is(.btn,.chip,.seg button,.step,.fab,.cal button,.item){transition:transform .12s cubic-bezier(.3,1.6,.5,1)}
 .goal{background:linear-gradient(135deg,var(--ink),#FFB38A)}
 
 /* 후회할 때 기분 */
