@@ -134,7 +134,7 @@
   <div class="set-menu" id="set-menu">
     <button class="set-item" data-setpage="book"><span class="si-ic">📒</span><span class="si-t"><b>가계부</b><small>이름 · 한 달 시작일 · 카테고리</small></span><span class="si-go">›</span></button>
     <button class="set-item" data-setpage="look"><span class="si-ic">🎨</span><span class="si-t"><b>화면</b><small>화면 모드 · 글씨체</small></span><span class="si-go">›</span></button>
-    <button class="set-item" data-setpage="review"><span class="si-ic">💭</span><span class="si-t"><b>소비 리뷰</b><small>리뷰 금액 · 시점 · 카테고리 · 그때 기분</small></span><span class="si-go">›</span></button>
+    <button class="set-item" data-setpage="review"><span class="si-ic">💭</span><span class="si-t"><b>소비 리뷰</b><small>리뷰 금액 · 시점 · 카테고리 · 만족 · 후회할 때 기분</small></span><span class="si-go">›</span></button>
     <button class="set-item" data-setpage="data"><span class="si-ic">📂</span><span class="si-t"><b>데이터 · 계정</b><small>CSV 가져오기 · 로그인 계정</small></span><span class="si-go">›</span></button>
   </div>
   <div class="set-page" data-page="book" hidden>
@@ -181,11 +181,20 @@
     <div><b>소비 리뷰 카테고리</b><p>고른 카테고리의 지출만 물어봐요</p></div>
     <div class="chips" id="s-rv-cats" style="margin-top:8px"></div>
   </div>
-  <div class="set-row stack">
-    <div><b>그때 기분</b><p>리뷰에서 만족이나 후회를 고르면 나오는 목록이에요. 누르면 고치고, ✕로 빼고, 아래에서 더해요</p></div>
-    <div class="chips" id="s-moods" style="margin-top:8px"></div>
+  <div class="set-row stack" data-moodbox="good">
+    <div><b>만족할 때 기분</b><p>리뷰에서 만족을 고르면 나오는 목록이에요. 누르면 고치고, ✕로 빼고, 아래에서 더해요</p></div>
+    <div class="chips" style="margin-top:8px"></div>
     <div class="row" style="margin-top:8px;display:flex;gap:8px">
-      <input class="input" id="s-mood-new" maxlength="12" autocomplete="off" placeholder="예: 😴 졸려서">
+      <input class="input" maxlength="12" autocomplete="off" placeholder="예: 😍 갖고 싶었던 거">
+      <button class="chip" data-moodcancel style="white-space:nowrap" hidden>취소</button>
+      <button class="chip" data-moodadd style="white-space:nowrap">추가</button>
+    </div>
+  </div>
+  <div class="set-row stack" data-moodbox="bad">
+    <div><b>후회할 때 기분</b><p>리뷰에서 후회를 고르면 나오는 목록이에요. 누르면 고치고, ✕로 빼고, 아래에서 더해요</p></div>
+    <div class="chips" style="margin-top:8px"></div>
+    <div class="row" style="margin-top:8px;display:flex;gap:8px">
+      <input class="input" maxlength="12" autocomplete="off" placeholder="예: 😴 졸려서">
       <button class="chip" data-moodcancel style="white-space:nowrap" hidden>취소</button>
       <button class="chip" data-moodadd style="white-space:nowrap">추가</button>
     </div>

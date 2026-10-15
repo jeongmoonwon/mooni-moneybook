@@ -131,7 +131,7 @@ function renderFormFeel() {
   $('#f-feel').innerHTML = Object.entries(FEELS).map(([k, ic]) => `<button class="chip sm" data-ffeel="${k}" aria-pressed="${f === k}">${ic} ${k}</button>`).join('')
     + (f ? '<button class="chip sm ghost-chip" data-ffeel="">리뷰 지우기</button>' : '');
   $('#f-mood').hidden = !withMood(f);
-  $('#f-mood').innerHTML = withMood(f) ? moods().map(([t, ic]) => `<button class="chip sm" data-fmood="${esc(t)}" aria-pressed="${state.formMood === t}">${ic} ${esc(t)}</button>`).join('') : '';
+  $('#f-mood').innerHTML = withMood(f) ? moodsFor(f).map(([t, ic]) => `<button class="chip sm" data-fmood="${esc(t)}" aria-pressed="${state.formMood === t}">${ic} ${esc(t)}</button>`).join('') : '';
   $('#f-feel-note').textContent = f ? '' : '아직 리뷰하지 않았어요. 여기서 바로 골라도 돼요';
 }
 
@@ -282,8 +282,12 @@ function satRate(list) {
 const withMood = f => f === '만족' || f === '후회'; // 만족 · 후회를 고르면 그때 기분 · 한 줄 메모도 남김
 const MOODS = [['지쳐서', '😩'], ['스트레스', '😤'], ['심심해서', '🥱'], ['들떠서', '🎉'], ['분위기상', '🤝'], ['늦은 밤', '🌙']];
 // 설정에서 추가·삭제한 목록 (없으면 기본). Firestore는 배열 안에 배열을 못 담아서 {t, ic} 객체로 저장한다
-const moods = () => state.settings.moods ? state.settings.moods.map(m => Array.isArray(m) ? m : [m.t, m.ic]) : MOODS;
-const moodIcon = m => (moods().find(([t]) => t === m) || MOODS.find(([t]) => t === m) || [])[1] || '💭';
+// 만족할 때 기분 (설정에서 따로 고침)
+const GOOD_MOODS = [['오래 고민해서', '🤔'], ['잘 쓰는 중', '👍'], ['기분 전환', '🌈'], ['나를 위해', '🎁'], ['함께라서', '🥰'], ['가성비 굿', '💰']];
+const MOOD_KINDS = { bad: { key: 'moods', def: MOODS, feel: '후회' }, good: { key: 'goodMoods', def: GOOD_MOODS, feel: '만족' } };
+const moods = (kind = 'bad') => { const k = MOOD_KINDS[kind], v = state.settings[k.key]; return v ? v.map(m => Array.isArray(m) ? m : [m.t, m.ic]) : k.def; };
+const moodsFor = feel => moods(feel === '만족' ? 'good' : 'bad');
+const moodIcon = m => ([...moods('bad'), ...moods('good'), ...MOODS, ...GOOD_MOODS].find(([t]) => t === m) || [])[1] || '💭';
 
 function renderHome() {
   const key = periodOfDate(today());
@@ -736,7 +740,7 @@ function renderReview() {
       <p class="rv-q">지금 돌아보니 어때요?</p>
       <div class="rv-choices">${Object.entries(FEELS).map(([f, ic]) => `<button data-feel="${f}" aria-pressed="${sel.feel === f}"><span>${ic}</span>${f}</button>`).join('')}</div>
       ${withMood(sel.feel) ? `<div class="rv-mood"><p class="rv-q" style="margin:14px 0 8px">그때 기분이 어땠어요? <small>(선택)</small></p>
-        <div class="mood-chips">${moods().map(([t, ic]) => `<button class="chip" data-mood="${esc(t)}" aria-pressed="${sel.mood === t}">${ic} ${esc(t)}</button>`).join('')}</div>
+        <div class="mood-chips">${moodsFor(sel.feel).map(([t, ic]) => `<button class="chip" data-mood="${esc(t)}" aria-pressed="${sel.mood === t}">${ic} ${esc(t)}</button>`).join('')}</div>
         ${sel.open ? `<textarea class="input mood-memo" id="rv-memo" rows="2" maxlength="80" placeholder="${sel.feel === '만족' ? '어떤 점이 좋았어요?' : '다음엔 어떻게 해 볼까요?'} (선택)">${esc(sel.memo)}</textarea>`
           : '<button class="link-btn" data-moodmemo>✎ 한 줄 남기기 (선택)</button>'}</div>` : ''}</div>
     <div class="actions"><button class="btn primary" data-moodok ${sel.feel ? '' : 'disabled'}>확인</button></div>
@@ -750,7 +754,8 @@ function answerReview(feel) {
     state.rvI++; state.rvSel = null; return renderReview();
   }
   const sel = state.rvSel; keepMemo();
-  sel.feel = feel; if (!withMood(feel)) { sel.mood = ''; }
+  if (sel.feel !== feel) sel.mood = ''; // 만족 ↔ 후회는 기분 목록이 달라서 고른 기분을 비움
+  sel.feel = feel;
   renderReview();
 }
 const keepMemo = () => { if ($('#rv-memo') && state.rvSel) state.rvSel.memo = $('#rv-memo').value; };
@@ -764,49 +769,53 @@ function saveMood() {
   state.rvI++; state.rvSel = null; renderReview();
 }
 
-// 설정: 그때 기분 목록(리뷰에서 만족 · 후회를 고르면 나옴) 추가 · 삭제 (예전 기록에 남은 기분은 그대로 보여요)
-// 기분 칩을 누르면 아래 칸에 불러와서 고치고('수정'), 다시 누르면 고치기 취소
+// 설정: 후회할 때 기분 · 만족할 때 기분 목록 추가 · 삭제 (예전 기록에 남은 기분은 그대로 보여요)
+// 기분 칩을 누르면 아래 칸에 불러와서 고치고('수정'), 다시 누르면 고치기 취소. kind: 'bad'(후회) · 'good'(만족)
+const moodBox = kind => $(`[data-moodbox="${kind}"]`), moodInput = kind => moodBox(kind).querySelector('input');
 function renderMoodSettings() {
-  const E = state.moodEdit;
-  $('#s-moods').innerHTML = moods().map(([t, ic], i) => `<span class="chip sm mood-item" aria-pressed="${E === i}">
-    <button class="mood-lab" data-moodedit="${i}" aria-label="${esc(t)} 고치기">${ic} ${esc(t)}</button><button data-mooddel="${i}" aria-label="${esc(t)} 삭제">✕</button></span>`).join('');
-  $('[data-moodadd]').textContent = E != null ? '수정' : '추가';
-  $('[data-moodcancel]').hidden = E == null;
-  $('#s-mood-new').placeholder = E != null ? '바꿀 이름 (앞에 이모지를 쓰면 아이콘도 바뀌어요)' : '예: 😴 졸려서';
+  for (const kind of ['bad', 'good']) {
+    const E = (state.moodEdit || {})[kind], box = moodBox(kind);
+    box.querySelector('.chips').innerHTML = moods(kind).map(([t, ic], i) => `<span class="chip sm mood-item" aria-pressed="${E === i}">
+      <button class="mood-lab" data-moodedit="${kind}|${i}" aria-label="${esc(t)} 고치기">${ic} ${esc(t)}</button><button data-mooddel="${kind}|${i}" aria-label="${esc(t)} 삭제">✕</button></span>`).join('');
+    box.querySelector('[data-moodadd]').textContent = E != null ? '수정' : '추가';
+    box.querySelector('[data-moodcancel]').hidden = E == null;
+    moodInput(kind).placeholder = E != null ? '바꿀 이름 (앞에 이모지를 쓰면 아이콘도 바뀌어요)' : kind === 'good' ? '예: 😍 갖고 싶었던 거' : '예: 😴 졸려서';
+  }
 }
-function cancelMoodEdit() { state.moodEdit = null; $('#s-mood-new').value = ''; renderMoodSettings(); }
-function editMood(i) {
-  if (state.moodEdit === i) return cancelMoodEdit();
-  const [t, ic] = moods()[i];
-  state.moodEdit = i; $('#s-mood-new').value = `${ic} ${t}`;
-  renderMoodSettings(); $('#s-mood-new').focus();
+const setMoodEdit = (kind, i) => { state.moodEdit = { ...state.moodEdit, [kind]: i }; };
+function cancelMoodEdit(kind) { setMoodEdit(kind, null); moodInput(kind).value = ''; renderMoodSettings(); }
+function editMood(kind, i) {
+  if ((state.moodEdit || {})[kind] === i) return cancelMoodEdit(kind);
+  const [t, ic] = moods(kind)[i];
+  setMoodEdit(kind, i); moodInput(kind).value = `${ic} ${t}`;
+  renderMoodSettings(); moodInput(kind).focus();
 }
-function saveMoods(list) {
-  const objs = list.map(([t, ic]) => ({ t, ic }));
-  state.settings.moods = objs; renderMoodSettings();
-  store.saveSettings({ moods: objs }).catch(err => toast('설정 저장 실패: ' + errMsg(err)));
+function saveMoods(kind, list) {
+  const objs = list.map(([t, ic]) => ({ t, ic })), key = MOOD_KINDS[kind].key;
+  state.settings[key] = objs; renderMoodSettings();
+  store.saveSettings({ [key]: objs }).catch(err => toast('설정 저장 실패: ' + errMsg(err)));
 }
-function addMood() {
-  const raw = $('#s-mood-new').value.trim(); if (!raw) return $('#s-mood-new').focus();
+function addMood(kind) {
+  const raw = moodInput(kind).value.trim(); if (!raw) return moodInput(kind).focus();
   const m = raw.match(/^(\p{Extended_Pictographic}[\uFE0F\u200D\p{Extended_Pictographic}]*)\s*(.+)$/u); // "😴 졸려서"처럼 앞에 이모지가 있으면 아이콘으로
-  const E = state.moodEdit, list = moods().slice();
+  const E = (state.moodEdit || {})[kind], list = moods(kind).slice();
   const [t, ic] = m ? [m[2].trim(), m[1]] : [raw, E != null ? list[E][1] : '💭'];
   if (list.some(([x], i) => x === t && i !== E)) { toast('이미 있는 기분이에요'); return; }
-  $('#s-mood-new').value = '';
-  if (E == null) return saveMoods([...list, [t, ic]]);
+  moodInput(kind).value = '';
+  if (E == null) return saveMoods(kind, [...list, [t, ic]]);
   const old = list[E][0];
-  list[E] = [t, ic]; state.moodEdit = null;
-  saveMoods(list);
-  if (old !== t) { // 이름을 바꾸면 예전 기록에 남은 기분 이름도 같이 바꾼다
-    const hit = state.entries.filter(e => e.mood === old);
+  list[E] = [t, ic]; setMoodEdit(kind, null);
+  saveMoods(kind, list);
+  if (old !== t) { // 이름을 바꾸면 예전 기록(만족 또는 후회)에 남은 기분 이름도 같이 바꾼다
+    const hit = state.entries.filter(e => e.mood === old && e.feel === MOOD_KINDS[kind].feel);
     hit.forEach(e => store.save({ ...e, mood: t }, e).catch(err => toast('동기화 실패: ' + errMsg(err))));
     toast(hit.length ? `'${t}'(으)로 바꿨어요 · 예전 기록 ${hit.length}개도 함께` : `'${t}'(으)로 바꿨어요`);
   } else toast('수정했어요');
 }
-function removeMood(i) {
-  state.moodEdit = null; $('#s-mood-new').value = '';
-  const list = moods().slice(); list.splice(i, 1);
-  saveMoods(list);
+function removeMood(kind, i) {
+  setMoodEdit(kind, null); moodInput(kind).value = '';
+  const list = moods(kind).slice(); list.splice(i, 1);
+  saveMoods(kind, list);
 }
 
 function saveReviewCfg(patch) {
@@ -831,9 +840,11 @@ function setPage(k) {
 // 설정 '확인': 입력 중인 값(이름, 리뷰 금액)을 반영하고 닫기
 function applySettings() {
   // 칸에 쓰고 '추가' 대신 '확인'을 눌러도 들어가게. 고치던 중이면 바꾼 게 있을 때만 반영하고, 그대로면 그냥 닫기
-  const E = state.moodEdit, v = $('#s-mood-new').value.trim();
-  if (E != null) { const [t, ic] = moods()[E]; if (v && v !== `${ic} ${t}` && v !== t) addMood(); else cancelMoodEdit(); }
-  else if (v) addMood();
+  for (const kind of ['bad', 'good']) {
+    const E = (state.moodEdit || {})[kind], v = moodInput(kind).value.trim();
+    if (E != null) { const [t, ic] = moods(kind)[E]; if (v && v !== `${ic} ${t}` && v !== t) addMood(kind); else cancelMoodEdit(kind); }
+    else if (v) addMood(kind);
+  }
   if (rvMinValue() !== reviewCfg().min) saveReviewCfg({ min: rvMinValue() });
   const title = $('#s-title').value.trim();
   if (title !== appTitle()) $('#s-title').dispatchEvent(new Event('change'));
@@ -1717,7 +1728,7 @@ function openSettings() {
   $('#s-rv-min').value = rv.min ? rv.min.toLocaleString('ko-KR') : '';
   $('#s-rv-days').innerHTML = Array.from({ length: 30 }, (_, i) => i + 1)
     .map(n => `<option value="${n}" ${n === rv.days ? 'selected' : ''}>${n}일 뒤</option>`).join('');
-  state.moodEdit = null; $('#s-mood-new').value = '';
+  state.moodEdit = null; moodInput('bad').value = moodInput('good').value = '';
   renderReviewCats(); renderMoodSettings();
   $('#s-import-msg').textContent = '';
   loadFont(); renderPrefs();
@@ -1855,12 +1866,12 @@ document.addEventListener('click', ev => {
   if (d.setback !== undefined) return $('#set-menu').hidden ? setPage('') : $('#settings').close();
   if (d.pieetc) { state.pieEtc = !state.pieEtc; return renderMonth(); }
   if (d.lookfold) { state.lookOpen = state.lookOpen === d.lookfold ? null : d.lookfold; return renderMonth(); }
-  if (d.ffeel !== undefined) { state.formFeel = d.ffeel || 'none'; if (!withMood(d.ffeel)) state.formMood = ''; return renderFormFeel(); }
+  if (d.ffeel !== undefined) { if (state.formFeel !== d.ffeel) state.formMood = ''; state.formFeel = d.ffeel || 'none'; return renderFormFeel(); }
   if (d.fmood !== undefined) { state.formMood = state.formMood === d.fmood ? '' : d.fmood; return renderFormFeel(); }
-  if (d.mooddel !== undefined) return removeMood(Number(d.mooddel));
-  if (d.moodedit !== undefined) return editMood(Number(d.moodedit));
-  if (d.moodcancel !== undefined) return cancelMoodEdit();
-  if (d.moodadd !== undefined) return addMood();
+  if (d.mooddel !== undefined) { const [k, i] = d.mooddel.split('|'); return removeMood(k, Number(i)); }
+  if (d.moodedit !== undefined) { const [k, i] = d.moodedit.split('|'); return editMood(k, Number(i)); }
+  if (d.moodcancel !== undefined) return cancelMoodEdit(b.closest('[data-moodbox]').dataset.moodbox);
+  if (d.moodadd !== undefined) return addMood(b.closest('[data-moodbox]').dataset.moodbox);
   if (d.pref) { const [k, v] = d.pref.split('|'); return setPref(k, v); }
   if (d.cemove) { const [i, dir] = d.cemove.split('|').map(Number); return moveCat(i, dir); }
   switch (b.id) {
@@ -1893,7 +1904,7 @@ $('#bm-word-in').addEventListener('keydown', e => { if (e.key === 'Enter') { e.p
 $('#bm-icon-in').addEventListener('input', e => { state.maker.icon = e.target.value.trim() || undefined; renderBadgeMaker(); });
 $('#bc-amt').addEventListener('input', e => { const n = Number(e.target.value.replace(/[^\d]/g, '')); e.target.value = n ? n.toLocaleString('ko-KR') : ''; });
 $('#bm-title').addEventListener('input', e => { state.maker.title = e.target.value; $('#bm-prev').innerHTML = `${badgeHtml(state.maker, { fill: 1, done: true })}<span><b>${esc(badgeName({ ...state.maker, title: e.target.value.trim() }))}</b><small>이번 달 안에 이루면 받아요</small></span>`; });
-$('#s-mood-new').addEventListener('keydown', e => { if (e.key === 'Enter') addMood(); });
+for (const kind of ['bad', 'good']) moodInput(kind).addEventListener('keydown', e => { if (e.key === 'Enter') addMood(kind); });
 $('#f-amount').addEventListener('input', () => setAmount(amountValue()));
 $('#budget-editor').addEventListener('pointerdown', budDragStart);
 $('#b-amount').addEventListener('input', e => { const n = Number(e.target.value.replace(/[^\d]/g, '')); e.target.value = n ? n.toLocaleString('ko-KR') : ''; $('#b-slider').value = n; paintBudgetSlider(); });
