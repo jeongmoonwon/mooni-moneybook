@@ -422,8 +422,8 @@ function emoMonths() { // 기록이 있는 첫 달부터 이번 달까지
   for (let k = first; k <= cur; k = shiftPeriod(k, 1)) ks.push(k);
   return ks;
 }
-// 버블: 왼쪽 만족 · 오른쪽 후회. 개수가 많은 쪽이 더 넓게, 자주 느낀 기분일수록 크게.
-// 손가락으로 끌면 따라오고 다른 방울은 밀려나며, 놓으면 제자리로 둥실 돌아감. 톡 누르면 그 기분의 소비 목록
+// 배지 모양 동그라미: 왼쪽 만족 · 오른쪽 후회. 개수가 많은 쪽이 더 넓게, 자주 느낀 기분일수록 크게.
+// 손가락으로 끌면 따라오고 다른 동그라미는 밀려나며, 놓은 자리에 그대로. 톡 누르면 그 기분의 소비 목록
 const EMO_W = 340, EMO_H = 236, EMO_TOP = 24;
 function packBubbles(items, x0, x1) { // 큰 것부터, 안 겹치면서 이쪽 가운데에 가장 가까운 자리에 둔다
   const placed = [], cx = (x0 + x1) / 2, cy = (EMO_TOP + EMO_H) / 2;
@@ -445,44 +445,42 @@ function emoMapSvg(exp) {
   const nG = exp.filter(e => e.feel === '만족').length, nB = exp.filter(e => e.feel === '후회').length;
   // 나누는 자리: 개수 비율대로 (한쪽만 있으면 전부, 둘 다 있으면 한쪽이 너무 좁아지지 않게 30~70%)
   const split = !nB ? EMO_W : !nG ? 0 : EMO_W * Math.min(0.7, Math.max(0.3, nG / (nG + nB)));
-  const size = (list, feel) => list.map(([t, n]) => ({ t, n, feel, ic: moodIcon(t), r: 15 + 24 * Math.sqrt(n / max) }));
+  // 배지처럼: 동그라미 안에 이모지, 아래에 이름. 자리 계산은 이름까지 들어가게 조금 크게(hit)
+  const size = (list, feel) => list.map(([t, n]) => { const r = 14 + 18 * Math.sqrt(n / max); return { t, n, feel, ic: moodIcon(t), r: r + 12, cr: r }; });
   const nodes = [...packBubbles(size(good, '만족'), 2, split - 3), ...packBubbles(size(bad, '후회'), split + 3, EMO_W - 2)];
-  state.emoNodes = nodes.map(n => ({ ...n, hx: n.x, hy: n.y, vx: 0, vy: 0 }));
-  const bubble = (b, i) => { const big = b.r >= 32, mid = b.r >= 25, label = big ? `${b.t} ${b.n}` : b.t, cls = b.feel === '만족' ? 'good' : 'bad';
-    const fs = Math.min(big ? 11 : 9.5, b.r * 1.75 / label.length); // 이름이 길면 원 안에 들어가게 글자를 줄임
-    return `<g class="bub ${cls}" data-mi="${i}" transform="translate(${b.x.toFixed(1)} ${b.y.toFixed(1)})" role="button" aria-label="${esc(b.t)} ${b.n}번, 눌러서 목록 보기">
-      <circle r="${b.r.toFixed(1)}" fill="url(#soap-${cls})"/><circle r="${b.r.toFixed(1)}" class="rim"/>
-      <ellipse cx="${(-b.r * 0.38).toFixed(1)}" cy="${(-b.r * 0.45).toFixed(1)}" rx="${(b.r * 0.28).toFixed(1)}" ry="${(b.r * 0.16).toFixed(1)}" transform="rotate(-35 ${(-b.r * 0.38).toFixed(1)} ${(-b.r * 0.45).toFixed(1)})" class="shine"/>
-      <circle cx="${(-b.r * 0.12).toFixed(1)}" cy="${(-b.r * 0.66).toFixed(1)}" r="${(b.r * 0.06).toFixed(1)}" class="shine"/>
-      <text y="${(mid ? -b.r * 0.18 : 5).toFixed(1)}" font-size="${(b.r * 0.55).toFixed(1)}" class="ic">${b.ic}</text>
-      ${mid ? `<text y="${(b.r * 0.38).toFixed(1)}" font-size="${fs.toFixed(1)}">${esc(label)}</text>` : ''}</g>`; };
-  const soap = (id, c) => `<radialGradient id="soap-${id}" cx="50%" cy="50%" r="50%">
-    <stop offset="0" stop-color="${c}" stop-opacity=".04"/><stop offset=".62" stop-color="${c}" stop-opacity=".10"/>
-    <stop offset=".88" stop-color="${c}" stop-opacity=".30"/><stop offset="1" stop-color="${c}" stop-opacity=".55"/></radialGradient>`;
+  const pos = state.emoPos || {}; // 끌어서 옮긴 자리는 기억 (기간을 바꾸면 다시 배치)
+  state.emoNodes = nodes.map(n => ({ ...n, ...(pos[n.feel + '|' + n.t] || {}) }));
+  const token = (b, i) => { const cls = b.feel === '만족' ? 'good' : 'bad', r = b.cr, label = `${b.t} ${b.n}`;
+    const fs = Math.min(10.5, (b.r * 2) / (label.length * 0.95)); // 이름이 길면 글자를 줄여서 다 보이게
+    return `<g class="tok ${cls}" data-mi="${i}" transform="translate(${b.x.toFixed(1)} ${b.y.toFixed(1)})" role="button" aria-label="${esc(b.t)} ${b.n}번, 눌러서 목록 보기">
+      <g transform="translate(0 -7)"><circle r="${r.toFixed(1)}" class="shade"/><circle r="${(r - 0.5).toFixed(1)}" cy="-3" class="face" clip-path="url(#emo-clip-${i})"/>
+        <clipPath id="emo-clip-${i}"><circle r="${r.toFixed(1)}"/></clipPath>
+        <text y="${(r * 0.32).toFixed(1)}" font-size="${(r * 0.9).toFixed(1)}" class="ic">${b.ic}</text></g>
+      <text y="${(r + 6).toFixed(1)}" font-size="${fs.toFixed(1)}" class="nm">${esc(b.t)} <tspan class="n">${b.n}</tspan></text></g>`; };
   return `<svg viewBox="0 0 ${EMO_W} ${EMO_H}" class="emo-svg" role="img" aria-label="만족할 때 기분 ${good.map(([t, n]) => `${t} ${n}번`).join(', ') || '없음'}, 후회할 때 기분 ${bad.map(([t, n]) => `${t} ${n}번`).join(', ') || '없음'}">
-    <defs>${soap('good', '#36A66B')}${soap('bad', '#E5534B')}</defs>
-    ${nG ? `<text x="4" y="14" class="side good">😊 만족 ${nG}</text>` : ''}${nB ? `<text x="${EMO_W - 4}" y="14" class="side bad">후회 ${nB} 😣</text>` : ''}
-    ${nodes.map(bubble).join('')}
+    <text x="2" y="14" class="side"><tspan class="good">😊 만족 ${nG}</tspan><tspan class="sep"> · </tspan><tspan class="bad">😣 후회 ${nB}</tspan></text>
+    ${state.emoNodes.map(token).join('')}
   </svg>`;
 }
-// 끌기: 잡은 방울은 손가락을 따라가고, 겹친 방울은 밀어내고, 나머지는 제자리로 살살 당겨짐
+// 끌기: 잡은 방울은 손가락을 따라가고, 겹친 방울은 밀려남. 놓은 자리에 그대로 있음
 function emoStep() {
   const N = state.emoNodes, svg = $('#home-emo .emo-svg'); if (!N || !svg) return (state.emoAnim = 0);
-  const drag = state.emoDrag; let moving = false;
-  for (const n of N) if (n !== (drag && drag.node)) { n.vx = (n.vx + (n.hx - n.x) * 0.03) * 0.82; n.vy = (n.vy + (n.hy - n.y) * 0.03) * 0.82; n.x += n.vx; n.y += n.vy; }
+  const drag = state.emoDrag; let moved = false;
   for (let k = 0; k < 3; k++) for (let i = 0; i < N.length; i++) for (let j = i + 1; j < N.length; j++) {
     const a = N[i], b = N[j], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 0.01, o = a.r + b.r + 2 - d;
-    if (o <= 0) continue;
+    if (o <= 0.1) continue;
+    moved = true;
     const ux = dx / d, uy = dy / d, aFix = drag && drag.node === a, bFix = drag && drag.node === b;
     const sa = aFix ? 0 : bFix ? 1 : 0.5, sb = bFix ? 0 : aFix ? 1 : 0.5;
-    a.x -= ux * o * sa; a.y -= uy * o * sa; b.x += ux * o * sb; b.y += uy * o * sb;
+    a.x -= ux * o * sa * 0.5; a.y -= uy * o * sa * 0.5; b.x += ux * o * sb * 0.5; b.y += uy * o * sb * 0.5; // 반씩 밀어서 부드럽게
   }
+  const pos = state.emoPos || (state.emoPos = {});
   N.forEach((n, i) => {
     n.x = Math.min(EMO_W - n.r, Math.max(n.r, n.x)); n.y = Math.min(EMO_H - n.r, Math.max(EMO_TOP - 6 + n.r, n.y));
-    if (Math.abs(n.vx) + Math.abs(n.vy) > 0.05 || Math.hypot(n.x - n.hx, n.y - n.hy) > 0.5) moving = true;
+    pos[n.feel + '|' + n.t] = { x: n.x, y: n.y };
     const g = svg.querySelector(`[data-mi="${i}"]`); if (g) g.setAttribute('transform', `translate(${n.x.toFixed(1)} ${n.y.toFixed(1)})`);
   });
-  state.emoAnim = moving || drag ? requestAnimationFrame(emoStep) : 0;
+  state.emoAnim = moved || drag ? requestAnimationFrame(emoStep) : 0;
 }
 const emoKick = () => { if (!state.emoAnim) state.emoAnim = requestAnimationFrame(emoStep); };
 function emoPoint(svg, ev) { const p = svg.createSVGPoint(); p.x = ev.clientX; p.y = ev.clientY; return p.matrixTransform(svg.getScreenCTM().inverse()); }
@@ -1906,7 +1904,7 @@ initEmoDrag();
 $('#home-emo').addEventListener('change', ev => {
   if (ev.target.id === 'eg-from') state.emoRange.from = ev.target.value;
   if (ev.target.id === 'eg-to') state.emoRange.to = ev.target.value;
-  saveEmoRange(); renderEmoMap();
+  saveEmoRange(); state.emoPos = null; renderEmoMap();
 });
 $('#trend-range').addEventListener('change', ev => {
   if (ev.target.id === 'tr-from') state.trendFrom = ev.target.value;
@@ -1998,7 +1996,7 @@ document.addEventListener('click', ev => {
   if (d.setback !== undefined) return $('#set-menu').hidden ? setPage('') : $('#settings').close();
   if (d.pieetc) { state.pieEtc = !state.pieEtc; return renderMonth(); }
   if (d.emorangetoggle !== undefined) { state.emoRangeOpen = !state.emoRangeOpen; return renderEmoMap(); }
-  if (d.emorange) { state.emoRange.range = d.emorange; saveEmoRange(); return renderEmoMap(); }
+  if (d.emorange) { state.emoRange.range = d.emorange; saveEmoRange(); state.emoPos = null; return renderEmoMap(); }
   if (d.lookfold) { state.lookOpen = state.lookOpen === d.lookfold ? null : d.lookfold; return renderMonth(); }
   if (d.ffeel !== undefined) { if (state.formFeel !== d.ffeel) state.formMood = ''; state.formFeel = d.ffeel || 'none'; return renderFormFeel(); }
   if (d.fmood !== undefined) { state.formMood = state.formMood === d.fmood ? '' : d.fmood; return renderFormFeel(); }

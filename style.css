@@ -576,18 +576,18 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 .lb-nums .lb-reg{background:color-mix(in srgb,var(--bad) 12%,var(--card))}.lb-nums .lb-reg b{color:var(--bad)}
 .lb-nums .lb-badge b{color:var(--t-strong)}
 .lb-nums .lb-tap[aria-expanded=true]{border-color:var(--ink)}
-/* 홈 마음 지도 (비눗방울) */
+/* 홈 마음 지도 (배지 모양 동그라미) */
 .emo svg{display:block;width:100%;height:auto;overflow:visible}
 .emo text{text-anchor:middle;font-family:var(--round),var(--kfont),sans-serif;pointer-events:none}
 .emo .ic{font-family:system-ui,sans-serif}
-.emo .side{font-size:12px}.emo .side.good{fill:var(--good);text-anchor:start}.emo .side.bad{fill:var(--bad);text-anchor:end}
-.emo .bub{cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none}
-.emo .bub.held{cursor:grabbing}
-.emo .bub .rim{fill:none;stroke-width:1.4}
-.emo .good .rim{stroke:color-mix(in srgb,var(--good) 55%,transparent)}.emo .bad .rim{stroke:color-mix(in srgb,var(--bad) 55%,transparent)}
-.emo .bub .shine{fill:#fff;opacity:.75;pointer-events:none}
-.emo .bub.held circle{filter:drop-shadow(0 4px 6px rgba(0,0,0,.12))}
-.emo .good text{fill:var(--good)}.emo .bad text{fill:var(--bad)}
+.emo .side{font-size:12px;text-anchor:start}.emo .side .good{fill:var(--good)}.emo .side .bad{fill:var(--bad)}.emo .side .sep{fill:var(--mu)}
+.emo .tok{cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none}
+.emo .tok.held{cursor:grabbing}
+.emo .tok .shade{filter:drop-shadow(0 2px 3px rgba(0,0,0,.08))}
+.emo .good .shade{fill:color-mix(in srgb,var(--good) 40%,var(--card))}.emo .good .face{fill:color-mix(in srgb,var(--good) 24%,var(--card))}
+.emo .bad .shade{fill:color-mix(in srgb,var(--bad) 36%,var(--card))}.emo .bad .face{fill:color-mix(in srgb,var(--bad) 20%,var(--card))}
+.emo .tok.held .shade{filter:drop-shadow(0 5px 7px rgba(0,0,0,.16))}
+.emo .nm{fill:var(--t1)}.emo .good .n{fill:var(--good)}.emo .bad .n{fill:var(--bad)}
 .lb-panel{margin-top:8px;border:1.5px solid var(--ink);border-radius:16px;padding:10px 12px 4px}
 .lb-panel > p{margin:0;font-size:14px;font-weight:700}
 
