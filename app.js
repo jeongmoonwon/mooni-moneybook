@@ -297,12 +297,14 @@ function renderRecord() {
   renderCalendar();
 }
 
-// 기록 탭 달력 위: 보고 있는 달의 수입·지출 합계 (이번 달이면 오늘까지)
+// 기록 탭 달력 위: 보고 있는 달의 수입·지출 합계 (이번 달이면 오늘까지). 오른쪽 남은 돈 = 수입 − 지출 − 저축·투자
 function renderCalSum() {
   const { start, end } = periodRange(state.period), t = today(), live = t >= start && t <= end;
   const list = state.entries.filter(e => e.date >= start && e.date <= (live ? t : end));
   const sum = type => list.filter(e => e.type === type).reduce((s, e) => s + e.amount, 0);
-  $('#cal-sum').innerHTML = `<p>수입 <b class="num in">+${won(sum('수입'))}</b></p><p>지출 <b class="num ex">−${won(sum('지출'))}</b></p>`;
+  const sv = sum('저축') + sum('투자'), left = sum('수입') - sum('지출') - sv;
+  $('#cal-sum').innerHTML = `<div><p>수입 <b class="num in">+${won(sum('수입'))}</b></p><p>지출 <b class="num ex">−${won(sum('지출'))}</b></p></div>
+    <div class="cs-left"><small>남은 돈</small><b class="num${left < 0 ? ' minus' : ''}">${left < 0 ? '−' : ''}${won(Math.abs(left))}</b>${sv ? `<small>저축·투자 ${compact(sv)} 빼고</small>` : ''}</div>`;
 }
 
 /* ================= 배지 (한 달 단위 도전) ================= */
