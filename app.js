@@ -596,7 +596,7 @@ function openEarned() {
 }
 
 /* ================= 첫 화면: 나의 상태 · 월말 결산 ================= */
-// 한 달 결과로 다음 달 모습(병아리 + 장식)과 칭호를 정한다
+// 한 달 결과로 다음 달 칭호를 정한다 (병아리 그림은 레벨로: chick.js)
 function monthStats(key) {
   const exp = periodEntries(key).filter(e => e.type === '지출');
   return { days: new Set([...periodEntries(key), ...state.held.filter(h => periodOf(h) === key)].map(e => e.date)).size,
@@ -612,29 +612,27 @@ function allReviewed(key) {
   return elig.length >= 3 && elig.every(e => e.feel);
 }
 function monthLook(key) {
-  const s = monthStats(key), deco = ['🌷', '🎀', '👑', '✨'].slice(0, Math.min(4, s.badges)).join('');
-  if (s.days < 5) return { face: '🐣', deco: '', title: '다시 시작하는 병아리' };
+  const s = monthStats(key);
+  if (s.days < 5) return { face: '🐣', title: '다시 시작하는 병아리' };
   const title = s.held >= 5 ? '잘 참는 병아리' : s.sat != null && s.sat >= 60 ? '만족 소비 요정'
     : allReviewed(key) ? '꼼꼼한 리뷰러' : '차곡차곡 병아리';
-  return { face: '🐥', deco, title };
+  return { face: '🐥', title };
 }
 function renderStatus() {
   const key = periodOfDate(today()), prev = shiftPeriod(key, -1), m = Number(key.slice(5));
-  const hasPrev = periodEntries(prev).length > 0, look = hasPrev ? monthLook(prev) : { face: '🐣', deco: '', title: '새내기 기록러' };
-  const cur = monthStats(key), last = monthStats(prev), lv = Math.floor(earnedBadges().length / 3) + 1;
+  const hasPrev = periodEntries(prev).length > 0, look = hasPrev ? monthLook(prev) : { face: '🐣', title: '새내기 기록러' };
+  const cur = monthStats(key), lv = Math.floor(earnedBadges().length / 3) + 1, stage = Math.min(lv, 6); // 배지 3개마다 Lv.1 → 사는 곳이 바뀜
   const { start } = periodRange(key), day = Math.round((parse(today()) - parse(start)) / 864e5) + 1;
-  const list = badgesOf(key), ps = list.map(b => badgeProgress(b, key));
   const goal = (state.settings.goals || {})[key] || '', rq = reviewQueue().length;
   $('#home-status').innerHTML = `<div class="card status">
-    <div class="st-top"><div class="st-face">${look.face}${look.deco ? `<i>${look.deco}</i>` : ''}<span class="st-lv">Lv.${lv}</span></div>
+    <div class="st-top"><div class="st-face lv${stage}"><span class="st-art">${chickArt(stage)}</span><span class="st-lv">Lv.${lv}</span></div>
       <div style="flex:1;min-width:0"><p class="st-title">${esc(look.title)} · ${m}월 ${day}일째</p>
         <button class="st-goal-big${goal ? '' : ' empty'}" data-goal aria-label="${m}월 다짐 ${goal ? '고치기' : '적기'}"><span class="g-lab">🎯 ${m}월 다짐</span>${goal
           ? `${esc(goal)} <span class="g-pen">✎</span>` : '<span class="g-add">＋ 이번 달 다짐 적기</span>'}</button></div></div>
-    <div class="st-chips"><div><b>${cur.sat != null ? cur.sat + '%' : '–'}</b><small>😊 만족</small></div><div><b>${cur.held}번</b><small>🙌 참음</small></div>
-      <div><b>${ps.filter(p => p.done).length}/${list.length}</b><small>🏅 배지</small></div><div class="warn"><b>${cur.regret}번</b><small>😣 후회</small></div></div>
     <div class="st-act"><button class="st-rv" data-review ${rq ? '' : 'disabled'}>💭 리뷰하기${rq ? `<span class="st-badge">${rq}</span>` : ''}</button>
       <button class="st-hd" data-held="">🙌 참았어요</button></div>
     ${rq ? '' : '<p class="st-none">지금은 리뷰할 소비가 없어요</p>'}
+    <button class="st-sum" data-lookback><span>😊 만족 <b>${cur.sat != null ? cur.sat + '%' : '–'}</b> · 🙌 <b>${cur.held}번</b> 참음</span><i>자세히 ›</i></button>
     </div>`;
   renderRecap(key, prev, look, hasPrev);
 }
@@ -643,15 +641,15 @@ function renderRecap(key, prev, look, hasPrev) {
   let seen = ''; try { seen = localStorage.getItem('recapSeen') || ''; } catch { /* 무시 */ }
   const { start } = periodRange(key), day = Math.round((parse(today()) - parse(start)) / 864e5) + 1;
   if (!hasPrev || day > 7 || seen === key) { $('#home-recap').innerHTML = ''; return; }
-  const before = shiftPeriod(prev, -1), was = periodEntries(before).length ? monthLook(before) : { face: '🐣', deco: '', title: '새내기 기록러' };
+  const before = shiftPeriod(prev, -1), was = periodEntries(before).length ? monthLook(before) : { face: '🐣', title: '새내기 기록러' };
   const a = monthStats(prev), b = monthStats(before), pm = Number(prev.slice(5)), m = Number(key.slice(5));
   const cmp = (x, y, good) => y == null || x == null ? '' : x === y ? '<small>지난달과 같아요</small>' : `<small class="${(x > y) === good ? 'good' : 'bad'}">지난달 ${y} ${x > y ? '↑' : '↓'}</small>`;
   $('#home-recap').innerHTML = `<div class="card recap">
     <div class="card-head" style="margin:0"><h2 style="margin:0">${pm}월 결산 → ${m}월의 나</h2><button class="icon-btn" data-recapclose aria-label="닫기">✕</button></div>
-    <div class="rc-months"><div class="rc-mo"><div class="rc-face">${was.face}${was.deco}</div><b>${pm}월의 나</b><span>${esc(was.title)}</span></div><span class="rc-arrow">→</span>
-      <div class="rc-mo now"><div class="rc-face">${look.face}${look.deco}</div><b>${m}월의 나</b><span>✨ ${esc(look.title)}</span></div></div>
+    <div class="rc-months"><div class="rc-mo"><div class="rc-face">${chickArt(was.face === '🐣' ? 1 : 0)}</div><b>${pm}월의 나</b><span>${esc(was.title)}</span></div><span class="rc-arrow">→</span>
+      <div class="rc-mo now"><div class="rc-face">${chickArt(look.face === '🐣' ? 1 : 0)}</div><b>${m}월의 나</b><span>✨ ${esc(look.title)}</span></div></div>
     <div class="rc-res"><div>😊 만족 <b>${a.sat != null ? a.sat + '%' : '–'}</b>${cmp(a.sat, b.sat, true)}</div><div>🙌 참음 <b>${a.held}번</b>${cmp(a.held, b.held, true)}</div>
-      <div>🏅 받은 배지 <b>${a.badges}개</b>${a.badges ? '<small>장식이 하나씩 붙어요</small>' : ''}</div><div>😣 후회 <b>${a.regret}번</b>${cmp(a.regret, b.regret, false)}</div></div></div>`;
+      <div>🏅 받은 배지 <b>${a.badges}개</b></div><div>😣 후회 <b>${a.regret}번</b>${cmp(a.regret, b.regret, false)}</div></div></div>`;
 }
 
 /* ================= 이번 달 목표 ================= */
@@ -946,25 +944,27 @@ function renderMonth() {
 
   const sv = list.filter(e => e.type === '저축' || e.type === '투자');
   $('#save-bars').innerHTML = barsHtml(sumBy(sv, e => e.type + '|' + e.category), null, null);
-  renderLookback(list.filter(e => e.type === '지출'), state.held.filter(h => periodOf(h) === state.period));
+  renderLookback(list.filter(e => e.type === '지출'), state.held.filter(h => periodOf(h) === state.period), state.period);
 
 }
 
 // 소비 만족도: 리뷰한 지출 중 만족 · 후회 금액끼리 비율(필수는 빼고 금액만). 후회한 소비는 큰 순서로
-// 돌아보기: 만족 · 후회 비율(금액 기준), 필수 금액, 후회할 때 가장 많았던 기분, 후회한 소비와 참은 소비 목록(눌러야 펼쳐짐)
-function renderLookback(exp, held) {
+// 돌아보기: 만족 · 후회 비율(금액 기준), 필수 금액, 받은 배지, 후회할 때 가장 많았던 기분, 후회한 소비와 참은 소비 목록(눌러야 펼쳐짐)
+function renderLookback(exp, held, key) {
   const done = exp.filter(e => FEELS[e.feel]), total = done.reduce((s, e) => s + e.amount, 0);
   const by = sumBy(done, e => e.feel), sat = satRate(done);
   const regret = done.filter(e => e.feel === '후회').sort((a, b) => b.amount - a.amount);
   const moods = new Map(); for (const e of regret) if (e.mood) moods.set(e.mood, (moods.get(e.mood) || 0) + 1);
   const topMood = [...moods].sort((a, b) => b[1] - a[1])[0], moodIc = moodIcon;
   const saved = held.reduce((s, h) => s + h.amount, 0), open = state.lookOpen || {};
+  const badges = badgesOf(key), got = badges.filter(b => badgeProgress(b, key).done).length;
   const regretItem = e => itemHtml(e).replace('</div></div>', `${e.mood ? ` <span class="cat">· ${moodIc(e.mood)} ${esc(e.mood)}</span>` : ''}${e.feelMemo ? `<div class="cat">“${esc(e.feelMemo)}”</div>` : ''}</div></div>`);
   const fold = (k, title, list, html, empty) => `<button class="lb-fold" data-lookfold="${k}" aria-expanded="${!!open[k]}"><span>${title}</span><i>${list.length ? (open[k] ? '접기 ▴' : '펼치기 ▾') : ''}</i></button>
     ${open[k] ? (list.length ? `<ul class="list">${list.map(html).join('')}</ul>` : `<p class="empty" style="padding:4px 0">${empty}</p>`) : ''}`;
   $('#lookback').innerHTML = `<h2 style="margin-bottom:2px">돌아보기</h2>
     <p class="label">${done.length ? `리뷰한 지출 ${done.length}건 · ${won(total)} 기준` : `아직 리뷰한 소비가 없어요 · ${won(reviewCfg().min)} 이상 지출을 ${reviewCfg().days}일 뒤 물어봐요`}</p>
     <div class="lb-nums"><div><b>${sat != null ? sat + '%' : '–'}</b><small>😊 만족</small></div><div class="warn"><b>${sat != null ? 100 - sat + '%' : '–'}</b><small>😣 후회</small></div><div><b>${by.get('필수') ? compact(by.get('필수')) : '–'}</b><small>🧾 필수</small></div><div class="held"><b>${held.length}번</b><small>🙌 참음${saved ? ` · ${compact(saved)}` : ''}</small></div></div>
+    ${badges.length ? `<p class="lb-mood">🏅 이 달 배지 · <b>${got}/${badges.length}개</b> 받음</p>` : ''}
     ${topMood ? `<p class="lb-mood">후회할 때 가장 많았던 기분 · <b>${moodIc(topMood[0])} ${esc(topMood[0])}</b> ${topMood[1]}번</p>` : ''}
     ${fold('regret', `😣 후회한 소비 ${regret.length}개`, regret, regretItem, '후회한 소비가 없어요')}
     ${fold('held', `🙌 참은 소비 ${held.length}개`, held.slice().sort((a, b) => b.date.localeCompare(a.date)), heldItemHtml, '사려다 참은 게 있으면 홈에서 기록해 보세요')}`;
@@ -1483,7 +1483,7 @@ function renderTrendDetail(d) {
 function go(view) {
   state.view = view;
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === 'view-' + view));
-  document.querySelectorAll('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.view === view));
+  document.querySelectorAll('nav.tabs [data-view]').forEach(b => b.setAttribute('aria-selected', b.dataset.view === view));
   refreshAll();
 }
 function refreshAll() {
@@ -1763,6 +1763,7 @@ document.addEventListener('click', ev => {
   const b = ev.target.closest('button, .item, .bar-row, .cb-head, .pie [data-jump], .pie [data-pieetc], [data-bcheck], [data-bmatch]'); if (!b) return;
   const d = b.dataset;
   if (d.view) { if (b.closest('dialog')) b.closest('dialog').close(); return go(d.view); }
+  if (d.lookback !== undefined) { state.period = periodOfDate(today()); go('month'); return $('#lookback').scrollIntoView({ behavior: 'smooth', block: 'start' }); } // 홈 상태 카드 → 이번 달 돌아보기
   if (d.type) { state.type = d.type; state.category = cats(d.type)[0]; return renderForm(); }
   if (d.cat) { state.category = d.cat; return renderForm(); }
   if (d.detail) { $('#f-detail').value = d.detail; return $('#f-amount').focus(); }
