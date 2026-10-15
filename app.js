@@ -634,7 +634,8 @@ function renderStatus() {
     <div class="st-act"><button class="st-rv" data-review ${rq ? '' : 'disabled'}>💭 리뷰하기${rq ? `<span class="st-badge">${rq}</span>` : ''}</button>
       <button class="st-hd" data-held="">🙌 참았어요</button></div>
     ${rq ? '' : '<p class="st-none">지금은 리뷰할 소비가 없어요</p>'}
-    <button class="st-sum" data-lookback><span>😊 만족 <b>${cur.sat != null ? cur.sat + '%' : '–'}</b> · 🙌 <b>${cur.held}번</b> 참음</span><i>자세히 ›</i></button>
+    <div class="st-nums"><button class="n-sat" data-lookback><small>😊 만족 ›</small><b>${cur.sat != null ? cur.sat + '%' : '–'}</b></button>
+      <button class="n-held" data-lookback><small>🙌 참음 ›</small><b>${cur.held}번</b></button><button class="n-reg" data-lookback><small>😣 후회 ›</small><b>${cur.regret}번</b></button></div>
     </div>`;
   renderRecap(key, prev, look, hasPrev);
 }
@@ -951,25 +952,28 @@ function renderMonth() {
 }
 
 // 소비 만족도: 리뷰한 지출 중 만족 · 후회 금액끼리 비율(필수는 빼고 금액만). 후회한 소비는 큰 순서로
-// 돌아보기: 만족 · 후회 비율(금액 기준), 필수 금액, 받은 배지, 후회할 때 가장 많았던 기분, 후회한 소비와 참은 소비 목록(눌러야 펼쳐짐)
+// 돌아보기: 만족 · 후회 비율(금액 기준), 필수 금액, 받은 배지, 후회할 때 가장 많았던 기분. 후회 · 참음 칸을 누르면 그 목록이 펼쳐짐
 function renderLookback(exp, held, key) {
   const done = exp.filter(e => FEELS[e.feel]), total = done.reduce((s, e) => s + e.amount, 0);
   const by = sumBy(done, e => e.feel), sat = satRate(done);
   const regret = done.filter(e => e.feel === '후회').sort((a, b) => b.amount - a.amount);
   const moods = new Map(); for (const e of regret) if (e.mood) moods.set(e.mood, (moods.get(e.mood) || 0) + 1);
   const topMood = [...moods].sort((a, b) => b[1] - a[1])[0], moodIc = moodIcon;
-  const saved = held.reduce((s, h) => s + h.amount, 0), open = state.lookOpen || {};
+  const saved = held.reduce((s, h) => s + h.amount, 0), open = state.lookOpen;
   const badges = badgesOf(key), got = badges.filter(b => badgeProgress(b, key).done).length;
   const regretItem = e => itemHtml(e).replace('</div></div>', `${e.mood ? ` <span class="cat">· ${moodIc(e.mood)} ${esc(e.mood)}</span>` : ''}${e.feelMemo ? `<div class="cat">“${esc(e.feelMemo)}”</div>` : ''}</div></div>`);
-  const fold = (k, title, list, html, empty) => `<button class="lb-fold" data-lookfold="${k}" aria-expanded="${!!open[k]}"><span>${title}</span><i>${list.length ? (open[k] ? '접기 ▴' : '펼치기 ▾') : ''}</i></button>
-    ${open[k] ? (list.length ? `<ul class="list">${list.map(html).join('')}</ul>` : `<p class="empty" style="padding:4px 0">${empty}</p>`) : ''}`;
+  const heldList = held.slice().sort((a, b) => b.date.localeCompare(a.date));
+  const tile = (k, cls, num, label) => `<button class="lb-tap ${cls}" data-lookfold="${k}" aria-expanded="${open === k}"><b>${num}</b><small>${label} ${open === k ? '▴' : '▾'}</small></button>`;
+  const panel = open === 'regret' ? [`😣 후회한 소비 ${regret.length}개`, regret, regretItem, '후회한 소비가 없어요']
+    : open === 'held' ? [`🙌 참은 소비 ${held.length}개${saved ? ` · ${won(saved)} 아낌` : ''}`, heldList, heldItemHtml, '사려다 참은 게 있으면 홈에서 기록해 보세요'] : null;
   $('#lookback').innerHTML = `<h2 style="margin-bottom:2px">돌아보기</h2>
     <p class="label">${done.length ? `리뷰한 지출 ${done.length}건 · ${won(total)} 기준` : `아직 리뷰한 소비가 없어요 · ${won(reviewCfg().min)} 이상 지출을 ${reviewCfg().days}일 뒤 물어봐요`}</p>
-    <div class="lb-nums"><div><b>${sat != null ? sat + '%' : '–'}</b><small>😊 만족</small></div><div class="warn"><b>${sat != null ? 100 - sat + '%' : '–'}</b><small>😣 후회</small></div><div><b>${by.get('필수') ? compact(by.get('필수')) : '–'}</b><small>🧾 필수</small></div><div class="held"><b>${held.length}번</b><small>🙌 참음${saved ? ` · ${compact(saved)}` : ''}</small></div></div>
+    <div class="lb-nums"><div><b>${sat != null ? sat + '%' : '–'}</b><small>😊 만족</small></div><div><b>${by.get('필수') ? compact(by.get('필수')) : '–'}</b><small>🧾 필수</small></div>
+      ${tile('regret', 'warn', sat != null ? 100 - sat + '%' : '–', `😣 후회 ${regret.length}개`)}${tile('held', 'held', `${held.length}번`, `🙌 참음${saved ? ` ${compact(saved)}` : ''}`)}</div>
+    ${panel ? `<div class="lb-panel"><p>${panel[0]}</p>${panel[1].length ? `<ul class="list">${panel[1].map(panel[2]).join('')}</ul>` : `<p class="empty" style="padding:4px 0">${panel[3]}</p>`}</div>` : ''}
     ${badges.length ? `<p class="lb-mood">🏅 이 달 배지 · <b>${got}/${badges.length}개</b> 받음</p>` : ''}
     ${topMood ? `<p class="lb-mood">후회할 때 가장 많았던 기분 · <b>${moodIc(topMood[0])} ${esc(topMood[0])}</b> ${topMood[1]}번</p>` : ''}
-    ${fold('regret', `😣 후회한 소비 ${regret.length}개`, regret, regretItem, '후회한 소비가 없어요')}
-    ${fold('held', `🙌 참은 소비 ${held.length}개`, held.slice().sort((a, b) => b.date.localeCompare(a.date)), heldItemHtml, '사려다 참은 게 있으면 홈에서 기록해 보세요')}`;
+`;
 }
 
 // 카테고리별 예산: 달마다 정한다. 전체 예산을 정하면 모든 카테고리에 똑같이 나눠 넣고(openBudget),
@@ -1840,7 +1844,7 @@ document.addEventListener('click', ev => {
   if (d.setpage) return setPage(d.setpage);
   if (d.setback !== undefined) return $('#set-menu').hidden ? setPage('') : $('#settings').close();
   if (d.pieetc) { state.pieEtc = !state.pieEtc; return renderMonth(); }
-  if (d.lookfold) { state.lookOpen = { ...state.lookOpen, [d.lookfold]: !(state.lookOpen || {})[d.lookfold] }; return renderMonth(); }
+  if (d.lookfold) { state.lookOpen = state.lookOpen === d.lookfold ? null : d.lookfold; return renderMonth(); }
   if (d.ffeel !== undefined) { state.formFeel = d.ffeel || 'none'; if (d.ffeel !== '후회') state.formMood = ''; return renderFormFeel(); }
   if (d.fmood !== undefined) { state.formMood = state.formMood === d.fmood ? '' : d.fmood; return renderFormFeel(); }
   if (d.mooddel !== undefined) return removeMood(Number(d.mooddel));

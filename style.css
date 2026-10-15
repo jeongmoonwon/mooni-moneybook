@@ -480,9 +480,13 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 .st-face .st-lv{position:absolute;bottom:-6px;right:-6px;background:var(--ink);color:var(--on-ink);font-size:12px;line-height:1.3;font-family:var(--round),sans-serif;border-radius:999px;padding:2px 8px;border:2px solid var(--card)}
 .st-title{margin:0;font-size:12px;font-weight:700;color:var(--t-strong)}
 .status h2{margin:2px 0;font-size:19px}
-.st-sum{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;margin-top:12px;border:0;background:var(--page);border-radius:14px;padding:9px 12px;font-size:13px;color:var(--t2);text-align:left}
-.st-sum b{font-family:var(--round),sans-serif;font-weight:400;color:var(--t1)}
-.st-sum i{font-style:normal;font-size:12px;color:var(--t-strong);white-space:nowrap}
+.st-nums{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.st-nums button{border:0;border-radius:16px;padding:9px 0 10px;display:flex;flex-direction:column;align-items:center;gap:1px}
+.st-nums small{font-size:12px;color:var(--t2)}
+.st-nums b{font:22px/1.15 var(--round),sans-serif}
+.st-nums .n-sat{background:color-mix(in srgb,var(--good) 14%,var(--card))}.st-nums .n-sat b{color:var(--good)}
+.st-nums .n-held{background:var(--wash)}.st-nums .n-held b{color:var(--t-strong)}
+.st-nums .n-reg{background:color-mix(in srgb,var(--bad) 12%,var(--card))}.st-nums .n-reg b{color:var(--bad)}
 .st-next{display:flex;align-items:center;gap:10px;margin-top:12px;background:var(--wash);border-radius:16px;padding:10px 12px;font-size:12px}
 .st-next span{white-space:nowrap}
 .st-next .bar{flex:1;height:8px;border-radius:999px;background:var(--card);overflow:hidden;min-width:40px}
@@ -574,8 +578,10 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 .lb-nums .held b{color:var(--t-strong)}
 #lookback{scroll-margin-top:70px} /* 홈 '자세히'로 올 때 위 머리글에 안 가리게 */
 .lb-mood{margin:12px 0 0;font-size:14px;background:var(--wash);border-radius:14px;padding:9px 12px}
-.lb-fold{display:flex;justify-content:space-between;align-items:center;width:100%;margin-top:10px;padding:11px 12px;border:0;border-radius:14px;background:var(--page);font-size:14px;font-weight:700;color:var(--t1)}
-.lb-fold i{font-style:normal;font-size:12px;color:var(--t-strong);font-weight:400}
+.lb-nums .lb-tap{border:1.5px solid var(--border);background:var(--card);border-radius:16px;padding:7px 2px;text-align:center;color:var(--t1)}
+.lb-nums .lb-tap[aria-expanded=true]{border-color:var(--ink);background:var(--wash)}
+.lb-panel{margin-top:8px;border:1.5px solid var(--ink);border-radius:16px;padding:10px 12px 4px}
+.lb-panel > p{margin:0;font-size:14px;font-weight:700}
 
 /* 원그래프 '그 외' 펼치기: 그래프 옆에 안에 든 카테고리 */
 .pie [data-pieetc]{cursor:pointer}
