@@ -468,15 +468,9 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 
 /* 첫 화면: 나의 상태 */
 .status .st-top{display:flex;gap:14px;align-items:center}
-.st-face{position:relative;width:84px;height:84px;border-radius:28px;background:linear-gradient(140deg,#FFE3D4,#FFF3C9);flex:none}
-.st-art{position:absolute;inset:0;border-radius:inherit;overflow:hidden}
-.st-art svg{display:block;width:100%;height:100%}
-/* 레벨별 배경 (그림은 chick.js) */
-.st-face.lv2{background:linear-gradient(160deg,#FFF1D6,#FFE3C4)}
-.st-face.lv3{background:linear-gradient(170deg,#DDF2FF,#F3FBE6)}
-.st-face.lv4{background:linear-gradient(170deg,#BFE0FF,#E6F1FF)}
-.st-face.lv5{background:linear-gradient(170deg,#CDE6FF,#FFE9F2)}
-.st-face.lv6{background:linear-gradient(140deg,#FFE79A,#FFC9A0);box-shadow:0 0 0 2px #FFD45C,0 0 14px color-mix(in srgb,#FFC93C 60%,transparent)}
+.st-face{position:relative;width:84px;height:84px;border-radius:28px;background:#FBF3DA;flex:none}
+.st-art{display:block;width:100%;height:100%;border-radius:inherit;object-fit:cover}
+.st-face.lv5{box-shadow:0 0 0 2px #FFD45C,0 0 14px color-mix(in srgb,#FFC93C 60%,transparent)}
 .st-face .st-lv{position:absolute;bottom:-6px;right:-6px;background:var(--ink);color:var(--on-ink);font-size:12px;line-height:1.3;font-family:var(--round),sans-serif;border-radius:999px;padding:2px 8px;border:2px solid var(--card)}
 .st-title{margin:0;font-size:12px;font-weight:700;color:var(--t-strong)}
 .status h2{margin:2px 0;font-size:19px}
@@ -485,7 +479,7 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 .st-nums small{font-size:12px;color:var(--t2)}
 .st-nums b{font:22px/1.15 var(--round),sans-serif}
 .st-nums .n-sat{background:color-mix(in srgb,var(--good) 14%,var(--card))}.st-nums .n-sat b{color:var(--good)}
-.st-nums .n-held{background:var(--wash)}.st-nums .n-held b{color:var(--t-strong)}
+.st-nums .n-held{background:color-mix(in srgb,var(--down) 14%,var(--card))}.st-nums .n-held b{color:var(--down)}
 .st-nums .n-reg{background:color-mix(in srgb,var(--bad) 12%,var(--card))}.st-nums .n-reg b{color:var(--bad)}
 .st-next{display:flex;align-items:center;gap:10px;margin-top:12px;background:var(--wash);border-radius:16px;padding:10px 12px;font-size:12px}
 .st-next span{white-space:nowrap}
@@ -513,7 +507,7 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 .rc-months{display:grid;grid-template-columns:1fr 22px 1fr;align-items:center;gap:4px;margin-top:12px}
 .rc-mo{border-radius:20px;padding:12px 6px;text-align:center;background:var(--page)}
 .rc-mo.now{background:linear-gradient(140deg,#FFE3D4,#FFF3C9)}
-.rc-face svg{display:block;width:58px;height:58px;margin:0 auto}
+.rc-face img{display:block;width:58px;height:58px;margin:0 auto;border-radius:18px}
 .rc-mo b{display:block;font:14px var(--round),sans-serif;margin-top:2px}
 .rc-mo span{font-size:11px;color:var(--t2)}
 .rc-arrow{text-align:center;color:var(--ink);font:18px var(--round),sans-serif}

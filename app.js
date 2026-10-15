@@ -598,7 +598,7 @@ function openEarned() {
 }
 
 /* ================= 첫 화면: 나의 상태 · 월말 결산 ================= */
-// 한 달 결과로 다음 달 칭호를 정한다 (병아리 그림은 레벨로: chick.js)
+// 한 달 결과로 다음 달 칭호를 정한다 (햄스터 그림은 레벨로: img/hamster-1~5)
 function monthStats(key) {
   const exp = periodEntries(key).filter(e => e.type === '지출');
   return { days: new Set([...periodEntries(key), ...state.held.filter(h => periodOf(h) === key)].map(e => e.date)).size,
@@ -615,19 +615,21 @@ function allReviewed(key) {
 }
 function monthLook(key) {
   const s = monthStats(key);
-  if (s.days < 5) return { face: '🐣', title: '다시 시작하는 병아리' };
-  const title = s.held >= 5 ? '잘 참는 병아리' : s.sat != null && s.sat >= 60 ? '만족 소비 요정'
-    : allReviewed(key) ? '꼼꼼한 리뷰러' : '차곡차곡 병아리';
+  if (s.days < 5) return { face: '🐣', title: '다시 시작하는 햄스터' };
+  const title = s.held >= 5 ? '잘 참는 햄스터' : s.sat != null && s.sat >= 60 ? '만족 소비 요정'
+    : allReviewed(key) ? '꼼꼼한 리뷰러' : '차곡차곡 햄스터';
   return { face: '🐥', title };
 }
+// 월말 결산 그림: 기록이 적었던 달은 걱정하는 햄스터, 아니면 윙크하는 햄스터
+const hamsterImg = look => `<img src="img/hamster-${look.face === '🐣' ? 1 : 3}.webp" alt="">`;
 function renderStatus() {
   const key = periodOfDate(today()), prev = shiftPeriod(key, -1), m = Number(key.slice(5));
   const hasPrev = periodEntries(prev).length > 0, look = hasPrev ? monthLook(prev) : { face: '🐣', title: '새내기 기록러' };
-  const cur = monthStats(key), lv = Math.floor(earnedBadges().length / 3) + 1, stage = Math.min(lv, 6); // 배지 3개마다 Lv.1 → 사는 곳이 바뀜
+  const cur = monthStats(key), lv = Math.min(5, Math.floor(earnedBadges().length / 3) + 1); // 배지 3개마다 Lv.1씩, Lv.5까지 (저금통이 점점 차오름)
   const { start } = periodRange(key), day = Math.round((parse(today()) - parse(start)) / 864e5) + 1;
   const goal = (state.settings.goals || {})[key] || '', rq = reviewQueue().length;
   $('#home-status').innerHTML = `<div class="card status">
-    <div class="st-top"><div class="st-face lv${stage}"><span class="st-art">${chickArt(stage)}</span><span class="st-lv">Lv.${lv}</span></div>
+    <div class="st-top"><div class="st-face lv${lv}"><img class="st-art" src="img/hamster-${lv}.webp" alt="Lv.${lv} 햄스터"><span class="st-lv">Lv.${lv}</span></div>
       <div style="flex:1;min-width:0"><p class="st-title">${esc(look.title)} · ${m}월 ${day}일째</p>
         <button class="st-goal-big${goal ? '' : ' empty'}" data-goal aria-label="${m}월 다짐 ${goal ? '고치기' : '적기'}"><span class="g-lab">🎯 ${m}월 다짐</span>${goal
           ? `${esc(goal)} <span class="g-pen">✎</span>` : '<span class="g-add">＋ 이번 달 다짐 적기</span>'}</button></div></div>
@@ -649,8 +651,8 @@ function renderRecap(key, prev, look, hasPrev) {
   const cmp = (x, y, good) => y == null || x == null ? '' : x === y ? '<small>지난달과 같아요</small>' : `<small class="${(x > y) === good ? 'good' : 'bad'}">지난달 ${y} ${x > y ? '↑' : '↓'}</small>`;
   $('#home-recap').innerHTML = `<div class="card recap">
     <div class="card-head" style="margin:0"><h2 style="margin:0">${pm}월 결산 → ${m}월의 나</h2><button class="icon-btn" data-recapclose aria-label="닫기">✕</button></div>
-    <div class="rc-months"><div class="rc-mo"><div class="rc-face">${chickArt(was.face === '🐣' ? 1 : 0)}</div><b>${pm}월의 나</b><span>${esc(was.title)}</span></div><span class="rc-arrow">→</span>
-      <div class="rc-mo now"><div class="rc-face">${chickArt(look.face === '🐣' ? 1 : 0)}</div><b>${m}월의 나</b><span>✨ ${esc(look.title)}</span></div></div>
+    <div class="rc-months"><div class="rc-mo"><div class="rc-face">${hamsterImg(was)}</div><b>${pm}월의 나</b><span>${esc(was.title)}</span></div><span class="rc-arrow">→</span>
+      <div class="rc-mo now"><div class="rc-face">${hamsterImg(look)}</div><b>${m}월의 나</b><span>✨ ${esc(look.title)}</span></div></div>
     <div class="rc-res"><div>😊 만족 <b>${a.sat != null ? a.sat + '%' : '–'}</b>${cmp(a.sat, b.sat, true)}</div><div>🙌 참음 <b>${a.held}번</b>${cmp(a.held, b.held, true)}</div>
       <div>🏅 받은 배지 <b>${a.badges}개</b></div><div>😣 후회 <b>${a.regret}번</b>${cmp(a.regret, b.regret, false)}</div></div></div>`;
 }
