@@ -293,6 +293,7 @@ function renderHome() {
   const key = periodOfDate(today());
   ensureMonthBadges();
   renderStatus();
+  renderEmoMap();
   renderHomeBadges();
 }
 // 기록 탭: 달력 + 고른 날의 내역, ＋로 기록
@@ -409,6 +410,49 @@ function earnedBadges() {
 function badgeHtml(b, p, small) {
   return `<span class="bd ${p.done ? 'full' : p.fill > 0 ? 'mid' : 'todo'}${small ? ' sm' : ''}" style="--c:${badgeColor(b)};--p:${Math.round(p.fill * 100)}%"><span>${badgeIcon(b)}</span></span>`;
 }
+/* ================= 홈: 감정 지도 ================= */
+// 이번 달 리뷰에서 고른 기분을 세서, 왼쪽은 만족 · 오른쪽은 후회 버블로. 자주 느낀 기분일수록 크게
+const EMO_W = 340, EMO_H = 236, EMO_TOP = 24;
+function packBubbles(items, x0, x1) { // 큰 것부터, 안 겹치면서 이쪽 가운데에 가장 가까운 자리에 둔다
+  const placed = [], cx = (x0 + x1) / 2, cy = (EMO_TOP + EMO_H) / 2;
+  for (const it of items) {
+    let best = null;
+    for (let x = x0 + it.r; x <= x1 - it.r; x += 3) for (let y = EMO_TOP + it.r; y <= EMO_H - it.r; y += 3) {
+      if (placed.some(p => Math.hypot(p.x - x, p.y - y) < p.r + it.r + 3)) continue;
+      const d = Math.hypot(x - cx, (y - cy) * 1.3);
+      if (!best || d < best.d) best = { x, y, d };
+    }
+    if (best) placed.push({ ...it, x: best.x, y: best.y });
+  }
+  return placed;
+}
+function renderEmoMap() {
+  const key = periodOfDate(today()), m = Number(key.slice(5));
+  const exp = periodEntries(key).filter(e => e.type === '지출' && e.mood && withMood(e.feel));
+  const count = feel => { const c = new Map(); for (const e of exp) if (e.feel === feel) c.set(e.mood, (c.get(e.mood) || 0) + 1);
+    return [...c].sort((a, b) => b[1] - a[1]).slice(0, 6); }; // 한쪽에 6개까지 (많으면 작은 원이 들어갈 자리가 없어서)
+  const good = count('만족'), bad = count('후회'), max = Math.max(1, ...[...good, ...bad].map(x => x[1]));
+  const size = list => list.map(([t, n]) => ({ t, n, ic: moodIcon(t), r: 15 + 24 * Math.sqrt(n / max) }));
+  const half = EMO_W / 2;
+  const bubble = (b, cls) => { const big = b.r >= 32, mid = b.r >= 25;
+    return `<g class="${cls}"><circle cx="${b.x.toFixed(1)}" cy="${b.y.toFixed(1)}" r="${b.r.toFixed(1)}"/>
+      <text x="${b.x.toFixed(1)}" y="${(b.y + (mid ? -b.r * 0.18 : 5)).toFixed(1)}" font-size="${(b.r * 0.55).toFixed(1)}" class="ic">${b.ic}</text>
+      ${mid ? `<text x="${b.x.toFixed(1)}" y="${(b.y + b.r * 0.38).toFixed(1)}" font-size="${big ? 11 : 9.5}">${esc(b.t.length > 7 ? b.t.slice(0, 6) + '…' : b.t)}${big ? ` ${b.n}` : ''}</text>` : ''}
+      <title>${esc(b.t)} ${b.n}번</title></g>`; };
+  const total = exp.length;
+  $('#home-emo').innerHTML = `<div class="card emo">
+    <h2 style="margin:0">${m}월 감정 지도</h2>
+    <p class="label" style="margin:2px 0 6px">${total ? `리뷰에 남긴 기분 ${total}개 · 클수록 자주 느낀 기분` : '리뷰할 때 그때 기분을 고르면 여기에 모여요'}</p>
+    ${total ? `<svg viewBox="0 0 ${EMO_W} ${EMO_H}" role="img" aria-label="만족할 때 기분 ${good.map(([t, n]) => `${t} ${n}번`).join(', ') || '없음'}, 후회할 때 기분 ${bad.map(([t, n]) => `${t} ${n}번`).join(', ') || '없음'}">
+      <line x1="${half}" y1="6" x2="${half}" y2="${EMO_H - 4}" class="mid"/>
+      <text x="4" y="14" class="side good" text-anchor="start">😊 만족 ${exp.filter(e => e.feel === '만족').length}</text>
+      <text x="${EMO_W - 4}" y="14" class="side bad" text-anchor="end">후회 ${exp.filter(e => e.feel === '후회').length} 😣</text>
+      ${packBubbles(size(good), 2, half - 4).map(b => bubble(b, 'good')).join('')}
+      ${packBubbles(size(bad), half + 4, EMO_W - 2).map(b => bubble(b, 'bad')).join('')}
+      ${good.length ? '' : `<text x="${half / 2}" y="${EMO_H / 2}" class="none">아직 없어요</text>`}${bad.length ? '' : `<text x="${half * 1.5}" y="${EMO_H / 2}" class="none">아직 없어요</text>`}
+    </svg>` : ''}</div>`;
+}
+
 function renderHomeBadges() {
   const key = periodOfDate(today()), list = badgesOf(key), m = Number(key.slice(5));
   const ps = list.map(b => badgeProgress(b, key)), got = ps.filter(p => p.done).length;

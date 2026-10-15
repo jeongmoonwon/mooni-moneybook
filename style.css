@@ -574,6 +574,16 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 .lb-nums .lb-reg{background:color-mix(in srgb,var(--bad) 12%,var(--card))}.lb-nums .lb-reg b{color:var(--bad)}
 .lb-nums .lb-badge b{color:var(--t-strong)}
 .lb-nums .lb-tap[aria-expanded=true]{border-color:var(--ink)}
+/* 홈 감정 지도 */
+.emo svg{display:block;width:100%;height:auto}
+.emo text{text-anchor:middle;font-family:var(--round),var(--kfont),sans-serif}
+.emo .ic{font-family:system-ui,sans-serif}
+.emo .mid{stroke:var(--border);stroke-width:1.5;stroke-dasharray:4 4}
+.emo .side{font-size:12px}.emo .side.good{fill:var(--good);text-anchor:start}.emo .side.bad{fill:var(--bad);text-anchor:end}
+.emo .good circle{fill:color-mix(in srgb,var(--good) 15%,var(--card));stroke:color-mix(in srgb,var(--good) 40%,transparent);stroke-width:1.5}
+.emo .bad circle{fill:color-mix(in srgb,var(--bad) 13%,var(--card));stroke:color-mix(in srgb,var(--bad) 40%,transparent);stroke-width:1.5}
+.emo .good text{fill:var(--good)}.emo .bad text{fill:var(--bad)}
+.emo .none{font-size:11px;fill:var(--mu)}
 .lb-mood{margin:12px 0 0;font-size:14px;background:var(--wash);border-radius:14px;padding:9px 12px}
 .lb-panel{margin-top:8px;border:1.5px solid var(--ink);border-radius:16px;padding:10px 12px 4px}
 .lb-panel > p{margin:0;font-size:14px;font-weight:700}
