@@ -578,7 +578,7 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 .lb-nums .lb-tap[aria-expanded=true]{border-color:var(--ink)}
 /* 홈 마음 지도 (배지 모양 동그라미) */
 .emo svg{display:block;width:100%;height:auto;overflow:visible}
-.emo text{text-anchor:middle;font-family:var(--round),var(--kfont),sans-serif;pointer-events:none}
+.emo text{text-anchor:middle;pointer-events:none} /* 글씨체는 앱 기본(body) 그대로 */
 .emo .ic{font-family:system-ui,sans-serif}
 .emo .side{font-size:12px;text-anchor:start}.emo .side .good{fill:var(--good)}.emo .side .bad{fill:var(--bad)}.emo .side .sep{fill:var(--mu)}
 .emo .tok{cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none}

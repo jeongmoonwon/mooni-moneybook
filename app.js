@@ -445,18 +445,18 @@ function emoMapSvg(exp) {
   const nG = exp.filter(e => e.feel === '만족').length, nB = exp.filter(e => e.feel === '후회').length;
   // 나누는 자리: 개수 비율대로 (한쪽만 있으면 전부, 둘 다 있으면 한쪽이 너무 좁아지지 않게 30~70%)
   const split = !nB ? EMO_W : !nG ? 0 : EMO_W * Math.min(0.7, Math.max(0.3, nG / (nG + nB)));
-  // 배지처럼: 동그라미 안에 이모지, 아래에 이름. 자리 계산은 이름까지 들어가게 조금 크게(hit)
-  const size = (list, feel) => list.map(([t, n]) => { const r = 14 + 18 * Math.sqrt(n / max); return { t, n, feel, ic: moodIcon(t), r: r + 12, cr: r }; });
+  // 배지처럼 도톰한 동그라미. 안에 이모지와 이름 · 횟수
+  const size = (list, feel) => list.map(([t, n]) => { const r = 19 + 19 * Math.sqrt(n / max); return { t, n, feel, ic: moodIcon(t), r: r + 2, cr: r }; });
   const nodes = [...packBubbles(size(good, '만족'), 2, split - 3), ...packBubbles(size(bad, '후회'), split + 3, EMO_W - 2)];
   const pos = state.emoPos || {}; // 끌어서 옮긴 자리는 기억 (기간을 바꾸면 다시 배치)
   state.emoNodes = nodes.map(n => ({ ...n, ...(pos[n.feel + '|' + n.t] || {}) }));
   const token = (b, i) => { const cls = b.feel === '만족' ? 'good' : 'bad', r = b.cr, label = `${b.t} ${b.n}`;
-    const fs = Math.min(10.5, (b.r * 2) / (label.length * 0.95)); // 이름이 길면 글자를 줄여서 다 보이게
+    const fs = Math.min(11, r * 1.6 / label.length); // 이름이 길면 원 안에 들어가게 글자를 줄임
     return `<g class="tok ${cls}" data-mi="${i}" transform="translate(${b.x.toFixed(1)} ${b.y.toFixed(1)})" role="button" aria-label="${esc(b.t)} ${b.n}번, 눌러서 목록 보기">
-      <g transform="translate(0 -7)"><circle r="${r.toFixed(1)}" class="shade"/><circle r="${(r - 0.5).toFixed(1)}" cy="-3" class="face" clip-path="url(#emo-clip-${i})"/>
-        <clipPath id="emo-clip-${i}"><circle r="${r.toFixed(1)}"/></clipPath>
-        <text y="${(r * 0.32).toFixed(1)}" font-size="${(r * 0.9).toFixed(1)}" class="ic">${b.ic}</text></g>
-      <text y="${(r + 6).toFixed(1)}" font-size="${fs.toFixed(1)}" class="nm">${esc(b.t)} <tspan class="n">${b.n}</tspan></text></g>`; };
+      <circle r="${r.toFixed(1)}" class="shade"/><circle r="${(r - 0.5).toFixed(1)}" cy="-3" class="face" clip-path="url(#emo-clip-${i})"/>
+      <clipPath id="emo-clip-${i}"><circle r="${r.toFixed(1)}"/></clipPath>
+      <text y="${(-r * 0.08).toFixed(1)}" font-size="${(r * 0.62).toFixed(1)}" class="ic">${b.ic}</text>
+      <text y="${(r * 0.5).toFixed(1)}" font-size="${fs.toFixed(1)}" class="nm">${esc(b.t)} <tspan class="n">${b.n}</tspan></text></g>`; };
   return `<svg viewBox="0 0 ${EMO_W} ${EMO_H}" class="emo-svg" role="img" aria-label="만족할 때 기분 ${good.map(([t, n]) => `${t} ${n}번`).join(', ') || '없음'}, 후회할 때 기분 ${bad.map(([t, n]) => `${t} ${n}번`).join(', ') || '없음'}">
     <text x="2" y="14" class="side"><tspan class="good">😊 만족 ${nG}</tspan><tspan class="sep"> · </tspan><tspan class="bad">😣 후회 ${nB}</tspan></text>
     ${state.emoNodes.map(token).join('')}
