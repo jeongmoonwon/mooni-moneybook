@@ -254,13 +254,10 @@ button.title:active{background:var(--wash)}
 .cal-legend .mu{color:var(--mu)}
 .cal .in{font-size:10px;color:var(--income);font-weight:700}
 .cal .sun .d{color:var(--bad)}
-.cal-nav{margin:-4px 0 8px}
 .cal-sum{margin:2px 4px 12px;font-size:13px;color:var(--t1)}
 .cal-sum p{margin:0;line-height:1.6}
 .cal-sum b{font-weight:600}
 .cal-sum b.in{color:var(--income)}
-.cal-nav .step{width:36px;height:36px;border-radius:12px;font-size:16px}
-.cal-nav .title b{font-size:17px}
 .hol-name{color:var(--bad);font-weight:600}
 .cal .saturday .d{color:var(--down)}
 .cal .sun .d.today,.cal .saturday .d.today{color:var(--on-ink)}
