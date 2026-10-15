@@ -254,7 +254,7 @@ button.title:active{background:var(--wash)}
 .cal-legend .mu{color:var(--mu)}
 .cal .in{font-size:10px;color:var(--income);font-weight:700}
 .cal .sun .d{color:var(--bad)}
-.cal-sum{margin:2px 4px 12px;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;gap:10px}
+.cal-sum{margin:2px 4px 12px;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
 .cal-sum .cs-left{white-space:nowrap}
 .cal-sum .cs-left b{color:var(--down)}
 .cal-sum .cs-left b.minus{color:var(--bad)}
