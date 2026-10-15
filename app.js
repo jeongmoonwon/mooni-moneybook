@@ -304,7 +304,7 @@ function renderCalSum() {
   const sum = type => list.filter(e => e.type === type).reduce((s, e) => s + e.amount, 0);
   const left = sum('수입') - sum('지출');
   $('#cal-sum').innerHTML = `<div><p>수입 <b class="num in">+${won(sum('수입'))}</b></p><p>지출 <b class="num ex">−${won(sum('지출'))}</b></p></div>
-    <div class="cs-left"><small>남은 돈</small><b class="num${left < 0 ? ' minus' : ''}">${left < 0 ? '−' : ''}${won(Math.abs(left))}</b></div>`;
+    <p class="cs-left">남은 돈 <b class="num${left < 0 ? ' minus' : ''}">${left < 0 ? '−' : ''}${won(Math.abs(left))}</b></p>`;
 }
 
 /* ================= 배지 (한 달 단위 도전) ================= */
