@@ -130,8 +130,8 @@ function renderFormFeel() {
   const f = FEELS[state.formFeel] ? state.formFeel : '';
   $('#f-feel').innerHTML = Object.entries(FEELS).map(([k, ic]) => `<button class="chip sm" data-ffeel="${k}" aria-pressed="${f === k}">${ic} ${k}</button>`).join('')
     + (f ? '<button class="chip sm ghost-chip" data-ffeel="">리뷰 지우기</button>' : '');
-  $('#f-mood').hidden = f !== '후회';
-  $('#f-mood').innerHTML = f === '후회' ? moods().map(([t, ic]) => `<button class="chip sm" data-fmood="${esc(t)}" aria-pressed="${state.formMood === t}">${ic} ${esc(t)}</button>`).join('') : '';
+  $('#f-mood').hidden = !withMood(f);
+  $('#f-mood').innerHTML = withMood(f) ? moods().map(([t, ic]) => `<button class="chip sm" data-fmood="${esc(t)}" aria-pressed="${state.formMood === t}">${ic} ${esc(t)}</button>`).join('') : '';
   $('#f-feel-note').textContent = f ? '' : '아직 리뷰하지 않았어요. 여기서 바로 골라도 돼요';
 }
 
@@ -252,7 +252,7 @@ function submit() {
   if (prev && state.type === '지출') {
     const f = state.formFeel;
     if (f && f !== 'none') e.feel = f; // 'none' = 리뷰 지우기 (feel 없이 저장)
-    if (f === '후회') { if (state.formMood) e.mood = state.formMood; if (prev.feelMemo) e.feelMemo = prev.feelMemo; }
+    if (withMood(f)) { if (state.formMood) e.mood = state.formMood; if (prev.feelMemo) e.feelMemo = prev.feelMemo; }
   }
   state.date = state.calDay = e.date;
   resetForm();
@@ -279,6 +279,7 @@ function satRate(list) {
   return sat + reg ? Math.round(sat / (sat + reg) * 100) : null;
 }
 // 후회를 고르면 한 번 더 묻는 그때 기분 (타이핑 없이 톡)
+const withMood = f => f === '만족' || f === '후회'; // 만족 · 후회를 고르면 그때 기분 · 한 줄 메모도 남김
 const MOODS = [['지쳐서', '😩'], ['스트레스', '😤'], ['심심해서', '🥱'], ['들떠서', '🎉'], ['분위기상', '🤝'], ['늦은 밤', '🌙']];
 // 설정에서 추가·삭제한 목록 (없으면 기본). Firestore는 배열 안에 배열을 못 담아서 {t, ic} 객체로 저장한다
 const moods = () => state.settings.moods ? state.settings.moods.map(m => Array.isArray(m) ? m : [m.t, m.ic]) : MOODS;
@@ -725,7 +726,7 @@ function renderReview() {
       <div class="actions"><button class="btn ghost" data-close>닫기</button><button class="btn primary" data-view="month">만족도 보기</button></div></div>`;
     return;
   }
-  // 고르기만 하고 '확인'을 눌러야 저장하고 다음으로. 후회를 고르면 그 아래에 그때 기분 · 한 줄 메모가 펼쳐짐
+  // 고르기만 하고 '확인'을 눌러야 저장하고 다음으로. 만족 · 후회를 고르면 그 아래에 그때 기분 · 한 줄 메모가 펼쳐짐
   const sel = state.rvSel || (state.rvSel = { feel: '', mood: '', memo: '', open: false });
   const d = parse(e.date), ago = Math.round((parse(today()) - d) / 864e5);
   $('#rv-body').innerHTML = `<div class="rv-prog"><span>소비 리뷰 · ${state.rvI + 1} / ${state.rv.length}</span><button class="icon-btn" data-close aria-label="리뷰 그만하기">✕</button></div>
@@ -734,9 +735,9 @@ function renderReview() {
       <div class="rv-amt num">${won(e.amount)}</div>
       <p class="rv-q">지금 돌아보니 어때요?</p>
       <div class="rv-choices">${Object.entries(FEELS).map(([f, ic]) => `<button data-feel="${f}" aria-pressed="${sel.feel === f}"><span>${ic}</span>${f}</button>`).join('')}</div>
-      ${sel.feel === '후회' ? `<div class="rv-mood"><p class="rv-q" style="margin:14px 0 8px">그때 기분이 어땠어요? <small>(선택)</small></p>
+      ${withMood(sel.feel) ? `<div class="rv-mood"><p class="rv-q" style="margin:14px 0 8px">그때 기분이 어땠어요? <small>(선택)</small></p>
         <div class="mood-chips">${moods().map(([t, ic]) => `<button class="chip" data-mood="${esc(t)}" aria-pressed="${sel.mood === t}">${ic} ${esc(t)}</button>`).join('')}</div>
-        ${sel.open ? `<textarea class="input mood-memo" id="rv-memo" rows="2" maxlength="80" placeholder="다음엔 어떻게 해 볼까요? (선택)">${esc(sel.memo)}</textarea>`
+        ${sel.open ? `<textarea class="input mood-memo" id="rv-memo" rows="2" maxlength="80" placeholder="${sel.feel === '만족' ? '어떤 점이 좋았어요?' : '다음엔 어떻게 해 볼까요?'} (선택)">${esc(sel.memo)}</textarea>`
           : '<button class="link-btn" data-moodmemo>✎ 한 줄 남기기 (선택)</button>'}</div>` : ''}</div>
     <div class="actions"><button class="btn primary" data-moodok ${sel.feel ? '' : 'disabled'}>확인</button></div>
     <div class="actions rv-sub"><button class="btn ghost" data-rvlater>이건 나중에</button><button class="btn ghost" data-feel="skip">이건 안 물어보기</button></div>`;
@@ -749,7 +750,7 @@ function answerReview(feel) {
     state.rvI++; state.rvSel = null; return renderReview();
   }
   const sel = state.rvSel; keepMemo();
-  sel.feel = feel; if (feel !== '후회') { sel.mood = ''; }
+  sel.feel = feel; if (!withMood(feel)) { sel.mood = ''; }
   renderReview();
 }
 const keepMemo = () => { if ($('#rv-memo') && state.rvSel) state.rvSel.memo = $('#rv-memo').value; };
@@ -758,12 +759,12 @@ function saveMood() {
   const e = state.rv[state.rvI], sel = state.rvSel; if (!e || !sel || !sel.feel) return;
   keepMemo();
   const r = { ...e, feel: sel.feel }; delete r.mood; delete r.feelMemo;
-  if (sel.feel === '후회') { if (sel.mood) r.mood = sel.mood; if (sel.memo.trim()) r.feelMemo = sel.memo.trim(); }
+  if (withMood(sel.feel)) { if (sel.mood) r.mood = sel.mood; if (sel.memo.trim()) r.feelMemo = sel.memo.trim(); }
   store.save(r, e).catch(err => toast('동기화 실패: ' + errMsg(err)));
   state.rvI++; state.rvSel = null; renderReview();
 }
 
-// 설정: 후회할 때 기분 목록 추가 · 삭제 (예전 기록에 남은 기분은 그대로 보여요)
+// 설정: 그때 기분 목록(리뷰에서 만족 · 후회를 고르면 나옴) 추가 · 삭제 (예전 기록에 남은 기분은 그대로 보여요)
 // 기분 칩을 누르면 아래 칸에 불러와서 고치고('수정'), 다시 누르면 고치기 취소
 function renderMoodSettings() {
   const E = state.moodEdit;
@@ -965,12 +966,17 @@ function renderLookback(exp, held, key) {
   const topMood = [...moods].sort((a, b) => b[1] - a[1])[0], moodIc = moodIcon;
   const saved = held.reduce((s, h) => s + h.amount, 0), open = state.lookOpen;
   const badges = badgesOf(key), got = badges.filter(b => badgeProgress(b, key).done).length;
-  const feelItem = e => itemHtml(e).replace('</div></div>', `${e.mood ? ` <span class="cat">· ${moodIc(e.mood)} ${esc(e.mood)}</span>` : ''}${e.feelMemo ? `<div class="cat">“${esc(e.feelMemo)}”</div>` : ''}</div></div>`);
+  // 펼친 목록은 종류 · 이모지 없이 날짜 · 카테고리(· 그때 기분)와 내용만
+  const feelItem = e => `<li class="item" data-id="${esc(e.id)}"><div class="main"><div class="cat">${md(e.date)} · ${esc(e.category)}${e.mood ? ` · ${esc(e.mood)}` : ''}</div>
+    <div class="det">${esc(e.detail || '—')}${e.memo ? ` <span class="cat">· ${esc(e.memo)}</span>` : ''}</div>${e.feelMemo ? `<div class="cat">“${esc(e.feelMemo)}”</div>` : ''}</div>
+    <div class="amt num">${won(e.amount)}</div></li>`;
+  const heldItem = h => `<li class="item" data-held="${esc(h.id)}"><div class="main"><div class="cat">${md(h.date)}${h.category ? ` · ${esc(h.category)}` : ''}${h.memo ? ` · ${esc(h.memo)}` : ''}</div>
+    <div class="det">${esc(h.detail)}</div></div><div class="amt num saved">${h.amount ? won(h.amount) + ' 아낌' : ''}</div></li>`;
   const heldList = held.slice().sort((a, b) => b.date.localeCompare(a.date));
   // 순서는 홈 상태 카드와 같게: 만족 · 참음 · 후회 (누르면 아래에 그 목록), 그 뒤 배지
   const tile = (k, cls, num, label) => `<button class="lb-tap ${cls}" data-lookfold="${k}" aria-expanded="${open === k}"><b>${num}</b><small>${label} ${open === k ? '▴' : '▾'}</small></button>`;
   const panel = open === 'good' ? [`😊 만족한 소비 ${good.length}개`, good, feelItem, '만족한 소비가 없어요']
-    : open === 'held' ? [`🙌 참은 소비 ${held.length}개${saved ? ` · ${won(saved)} 아낌` : ''}`, heldList, heldItemHtml, '사려다 참은 게 있으면 홈에서 기록해 보세요']
+    : open === 'held' ? [`🙌 참은 소비 ${held.length}개${saved ? ` · ${won(saved)} 아낌` : ''}`, heldList, heldItem, '사려다 참은 게 있으면 홈에서 기록해 보세요']
     : open === 'regret' ? [`😣 후회한 소비 ${regret.length}개`, regret, feelItem, '후회한 소비가 없어요'] : null;
   $('#lookback').innerHTML = `<h2 style="margin-bottom:2px">돌아보기</h2>
     <p class="label">${done.length ? `리뷰한 지출 ${done.length}건 · ${won(total)} 기준` : `아직 리뷰한 소비가 없어요 · ${won(reviewCfg().min)} 이상 지출을 ${reviewCfg().days}일 뒤 물어봐요`}</p>
@@ -1849,7 +1855,7 @@ document.addEventListener('click', ev => {
   if (d.setback !== undefined) return $('#set-menu').hidden ? setPage('') : $('#settings').close();
   if (d.pieetc) { state.pieEtc = !state.pieEtc; return renderMonth(); }
   if (d.lookfold) { state.lookOpen = state.lookOpen === d.lookfold ? null : d.lookfold; return renderMonth(); }
-  if (d.ffeel !== undefined) { state.formFeel = d.ffeel || 'none'; if (d.ffeel !== '후회') state.formMood = ''; return renderFormFeel(); }
+  if (d.ffeel !== undefined) { state.formFeel = d.ffeel || 'none'; if (!withMood(d.ffeel)) state.formMood = ''; return renderFormFeel(); }
   if (d.fmood !== undefined) { state.formMood = state.formMood === d.fmood ? '' : d.fmood; return renderFormFeel(); }
   if (d.mooddel !== undefined) return removeMood(Number(d.mooddel));
   if (d.moodedit !== undefined) return editMood(Number(d.moodedit));
