@@ -526,7 +526,7 @@ function renderEmoMap() {
   const exp = state.entries.filter(e => e.type === '지출' && e.mood && withMood(e.feel) && periodOf(e) >= a && periodOf(e) <= b);
   state.emoSpan = [a, b]; state.emoSpanLabel = a === b ? ym(a) : `${ym(a)} ~ ${ym(b)}`;
   $('#home-emo').innerHTML = `<div class="card emo">
-    <h2 style="margin:0">💗 마음 지도</h2><p class="label" style="margin:2px 0 0">클수록 자주 느낀 기분 · 끌어 보고, 톡 누르면 목록</p>
+    <h2 style="margin:0 0 2px">💗 마음 지도</h2>
     <button class="range-btn" data-emorangetoggle aria-expanded="${!!state.emoRangeOpen}">${{ month: '이번 달', year: '최근 1년', all: '전체', custom: '직접 선택' }[R.range]} · ${a === b ? ym(a) : `${fmt(a)} ~ ${fmt(b)}`} · 기분 ${exp.length}개 <i>${state.emoRangeOpen ? '▴' : '▾'}</i></button>
     ${state.emoRangeOpen ? `<div class="range-panel"><div class="seg">${[['month', '이번 달'], ['year', '최근 1년'], ['all', '전체'], ['custom', '직접 선택']]
       .map(([v, t]) => `<button data-emorange="${v}" aria-pressed="${v === R.range}">${t}</button>`).join('')}</div>
