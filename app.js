@@ -339,27 +339,27 @@ function badgeName(b) {
   if (b.title) return b.title;
   const c = b.cat ? b.cat + ' ' : '';
   return { held: `${c}${nfmt(b.n, b.unit)} 참기`, reduce: `${c || '지출 '}${nfmt(b.n, b.unit)} 이하`, sat: `만족 ${b.n}% 넘기기`,
-    regret: `후회 ${b.n}번 이하`, custom: `나만의 목표 ${nfmt(b.n, b.unit)} ${b.dir === 'down' ? '이하' : '이상'}`, daily: `${b.n}일 기록하기`, budget: '예산 안에서 쓰기' }[b.kind];
+    regret: `후회 ${b.n}번 이하`, custom: `나만의 목표 ${nfmt(b.n, b.unit)} ${badgeDir(b) === 'down' ? '이하' : '이상'}`, daily: `${b.n}일 기록하기`, budget: '예산 안에서 쓰기' }[b.kind];
 }
+// 직접 적는 배지의 방향. '이하' 고르기가 생기기 전(10월 11일)에 만든 배지는 dir이 없으니 이름으로 짐작
+const badgeDir = b => b.dir || (/줄이|덜|이하|아끼|안 ?(쓰|가|사|먹)|끊/.test(b.title || '') ? 'down' : 'up');
 const badgeIcon = b => b.icon || (b.cat && CAT_ICON[b.cat]) || BADGE_KINDS[b.kind].icon;
 const badgesOf = key => ((state.settings.badges || {})[key] || []).filter(b => BADGE_KINDS[b.kind]); // 없어진 종류(예전 '리뷰 다 하기')는 건너뜀
 
 // 진행도: fill(0~1) · label · done(받음) · fail(이번 달은 못 받음)
 function badgeProgress(b, key) {
-  const { start, end } = periodRange(key), t = today(), past = t > end;
-  const days = Math.round((parse(end) - parse(start)) / 864e5) + 1;
-  const elapsed = past ? 1 : t < start ? 0 : (Math.round((parse(t) - parse(start)) / 864e5) + 1) / days;
+  const past = today() > periodRange(key).end;
   const exp = periodEntries(key).filter(e => e.type === '지출');
   const mine = exp.filter(e => !b.cat || e.category === b.cat);
   const val = (list, unit) => unit === 'amount' ? list.reduce((s, e) => s + e.amount, 0) : list.length;
-  // '이하' 배지: 한 달을 넘지 않고 버티는 동안 날짜만큼 차오르고, 넘으면 비워진다
+  // '이하' 배지: 가득 찬 채로 시작해 쓸수록 남은 만큼만 색이 남고, 넘으면 비워진다. 한 달을 넘지 않고 버티면 받음
   const keepUnder = (used, n, unit) => used > n ? { fill: 0, label: '넘었어요', fail: true }
-    : past ? { fill: 1, label: '받았어요', done: true } : { fill: elapsed, label: `${nfmt(n - used, unit)} 남음` };
+    : past ? { fill: 1, label: '받았어요', done: true } : { fill: n ? 1 - used / n : 1, label: `${nfmt(n - used, unit)} 남음` };
   if (b.kind === 'custom') {
     const u = b.unit || 'count', auto = (b.words || []).length > 0;
     // 지정한 단어가 상세내역 · 메모 · 카테고리에 들어간 지출은 자동으로 센다. 단어가 없으면 홈에서 눌러 직접 기록
     const v = auto ? val(exp.filter(e => matchWords(e, b.words) && !(b.exclude || []).includes(e.id)), u) : b.count || 0;
-    if (b.dir === 'down') return keepUnder(v, b.n, u); // 적게 할수록 좋은 목표: 넘지 않고 한 달을 버티면 받음
+    if (badgeDir(b) === 'down') return keepUnder(v, b.n, u); // 적게 할수록 좋은 목표: 넘지 않고 한 달을 버티면 받음
     return v >= b.n ? { fill: 1, label: '받았어요', done: true } : { fill: v / b.n, label: `${nfmt(v, u)} / ${nfmt(b.n, u)}${auto ? '' : ' · 눌러서 기록'}`, fail: past };
   }
   if (b.kind === 'held') {
@@ -598,7 +598,7 @@ function badgeRecs() {
 /* ----- 나만의 배지 만들기: 무엇을 · 어떤 걸 · 얼마나 (한 달 단위) ----- */
 function openBadgeMaker(i) {
   const b = i != null ? state.badgeDraft[i] : null;
-  state.maker = b ? { ...b, idx: i } : { kind: 'held', cat: '', n: 3, unit: 'count', title: '', idx: null };
+  state.maker = b ? { ...b, ...(b.kind === 'custom' ? { dir: badgeDir(b) } : {}), idx: i } : { kind: 'held', cat: '', n: 3, unit: 'count', title: '', idx: null };
   renderBadgeMaker(); $('#badge-maker').showModal(); document.activeElement.blur();
 }
 // 난이도 숫자: 지난달 내 기록을 기준으로
@@ -688,8 +688,8 @@ function renderBadgeCheck() {
   $('#bc-body').innerHTML = `${badgeHtml(b, badgeProgress(b, key))}<h3>${esc(badgeName(b))}</h3>
     <p class="num">${nfmt(b.count || 0, u)} / ${nfmt(b.n, u)}</p>`;
   $('#bc-amt-f').hidden = u !== 'amount';
-  $('#bc-plus').textContent = u === 'amount' ? '＋ 더하기' : b.dir === 'down' ? '＋ 했어요 (1번)' : '＋ 했어요!';
-  $('#bc-hint').textContent = b.dir === 'down' ? `${nfmt(b.n, u)}을 넘지 않으면 받아요` : `${nfmt(b.n, u)}을 채우면 받아요`;
+  $('#bc-plus').textContent = u === 'amount' ? '＋ 더하기' : badgeDir(b) === 'down' ? '＋ 했어요 (1번)' : '＋ 했어요!';
+  $('#bc-hint').textContent = badgeDir(b) === 'down' ? `${nfmt(b.n, u)}을 넘지 않으면 받아요` : `${nfmt(b.n, u)}을 채우면 받아요`;
   $('#bc-minus').textContent = u === 'amount' ? '− 빼기' : '− 하나 빼기';
 }
 function badgeCheckStep(dir) {
@@ -702,7 +702,7 @@ function badgeCheckStep(dir) {
   }
   b.count = Math.max(0, (b.count || 0) + dir * step);
   saveBadges(key, list); renderBadgeCheck(); renderHome();
-  if (dir > 0) toast(b.dir === 'down' ? (b.count > b.n ? '이번 달 목표를 넘었어요 😢' : '기록했어요') : b.count >= b.n ? `🎉 '${badgeName(b)}' 배지를 받았어요!` : '기록했어요 👍');
+  if (dir > 0) toast(badgeDir(b) === 'down' ? (b.count > b.n ? '이번 달 목표를 넘었어요 😢' : '기록했어요') : b.count >= b.n ? `🎉 '${badgeName(b)}' 배지를 받았어요!` : '기록했어요 👍');
 }
 
 // 자동으로 세는 배지: 누르면 이번 달에 잡힌 기록 목록. 해당 없는 건 '빼기'로 제외하고, 뺀 건 아래에서 다시 넣을 수 있음
