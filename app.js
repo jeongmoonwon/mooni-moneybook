@@ -398,8 +398,9 @@ function ensureMonthBadges() {
   saveBadges(key, [...BASIC_BADGES(), ...carry]);
 }
 function saveBadges(key, list) {
+  list = JSON.parse(JSON.stringify(list)); // Firestore는 undefined 값(예: 예산 배지의 unit)이 있으면 바로 에러를 던져 완료가 멈춤
   state.settings.badges = { ...state.settings.badges, [key]: list }; // 저장이 돌아오기 전에도 바로 보이게
-  store.saveSettings({ badges: state.settings.badges }).catch(err => toast('배지 저장 실패: ' + errMsg(err)));
+  Promise.resolve().then(() => store.saveSettings({ badges: state.settings.badges })).catch(err => toast('배지 저장 실패: ' + errMsg(err)));
 }
 function earnedBadges() {
   const all = state.settings.badges || {}, out = [];
@@ -567,10 +568,13 @@ function renderBadgeEditor() {
   state.badgeRecs = recs;
 }
 const badgeDesc = b => [BADGE_KINDS[b.kind].label, b.cat, b.n != null && b.kind !== 'budget' ? nfmt(b.n, b.unit || BADGE_KINDS[b.kind].units[0]) : ''].filter(Boolean).join(' · ');
-function saveBadgeEditor() {
-  saveBadges(periodOfDate(today()), state.badgeDraft);
-  $('#badge-editor').close(); renderHome(); toast('배지 목록을 저장했어요');
-}
+// 완료 · ✕ · 바깥 누르기 어느 쪽으로 닫아도 고친 목록을 저장 (바뀐 게 있을 때만)
+function saveBadgeEditor() { $('#badge-editor').close(); }
+$('#badge-editor').addEventListener('close', () => {
+  const key = periodOfDate(today()), L = state.badgeDraft; state.badgeDraft = null;
+  if (!L || JSON.stringify(L) === JSON.stringify(badgesOf(key))) return;
+  saveBadges(key, L); renderHome(); toast('배지 목록을 저장했어요');
+});
 
 // 지난달 기록으로 '조금만 더' 해 볼 만한 배지를 추천
 function lastMonthStats() {
