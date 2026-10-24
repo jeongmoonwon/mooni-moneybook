@@ -68,7 +68,7 @@ const LEVELS = [
 const svg = (inner, bg = '', vb = '0 0 200 200') => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}">${bg}${inner}</svg>\n`;
 LEVELS.forEach((lv, i) => writeFileSync(new URL(`../img/hamster-${i + 1}.svg`, import.meta.url), svg(hamster(lv))));
 
-// 앱 아이콘: 크림색 바탕 + Lv.4 햄스터. 마스커블은 안전 영역(가운데 80%) 안으로 작게
-const icon = LEVELS[3];
+// 앱 아이콘: 크림색 바탕 + Lv.2 새싹 햄스터. 마스커블은 안전 영역(가운데 80%) 안으로 작게
+const icon = LEVELS[1];
 writeFileSync(new URL('icon.svg', import.meta.url), svg(`<g transform="translate(10 14) scale(.9)">${hamster(icon)}</g>`, '<rect width="200" height="200" fill="#FFF1DC"/>'));
 writeFileSync(new URL('icon-maskable.svg', import.meta.url), svg(`<g transform="translate(30 32) scale(.7)">${hamster(icon)}</g>`, '<rect width="200" height="200" fill="#FFF1DC"/>'));
