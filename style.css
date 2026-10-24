@@ -472,7 +472,7 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 .status .st-top{display:flex;gap:14px;align-items:center}
 .st-face{position:relative;width:84px;height:84px;border-radius:28px;background:#FBF3DA;flex:none}
 .st-art{display:block;width:100%;height:100%;border-radius:inherit;object-fit:cover}
-.st-face.lv5{box-shadow:0 0 0 2px #FFD45C,0 0 14px color-mix(in srgb,#FFC93C 60%,transparent)}
+.st-face.lv6{box-shadow:0 0 0 2px #FFD45C,0 0 14px color-mix(in srgb,#FFC93C 60%,transparent)}
 .st-face .st-lv{position:absolute;bottom:-6px;right:-6px;background:var(--ink);color:var(--on-ink);font-size:12px;line-height:1.3;font-family:var(--round),sans-serif;border-radius:999px;padding:2px 8px;border:2px solid var(--card)}
 .st-title{margin:0;font-size:12px;font-weight:700;color:var(--t-strong)}
 .status h2{margin:2px 0;font-size:19px}
@@ -509,7 +509,7 @@ h1,h2,.btn,.seg button,nav.tabs button,.period .title b,.hero,.goal b,.review-ca
 .rc-months{display:grid;grid-template-columns:1fr 22px 1fr;align-items:center;gap:4px;margin-top:12px}
 .rc-mo{border-radius:20px;padding:12px 6px;text-align:center;background:var(--page)}
 .rc-mo.now{background:linear-gradient(140deg,#FFE3D4,#FFF3C9)}
-.rc-face img{display:block;width:58px;height:58px;margin:0 auto;border-radius:18px}
+.rc-face img{display:block;width:58px;height:58px;margin:0 auto;border-radius:18px;background:#FBF3DA}
 .rc-mo b{display:block;font:14px var(--round),sans-serif;margin-top:2px}
 .rc-mo span{font-size:11px;color:var(--t2)}
 .rc-arrow{text-align:center;color:var(--ink);font:18px var(--round),sans-serif}

@@ -733,7 +733,7 @@ function openEarned() {
 }
 
 /* ================= 첫 화면: 나의 상태 · 월말 결산 ================= */
-// 한 달 결과로 다음 달 칭호를 정한다 (햄스터 그림은 레벨로: img/hamster-1~5)
+// 한 달 결과로 다음 달 칭호를 정한다 (햄스터 그림은 레벨로: img/hamster-1~6, tools/draw-hamsters.mjs로 그림)
 function monthStats(key) {
   const exp = periodEntries(key).filter(e => e.type === '지출');
   return { days: new Set([...periodEntries(key), ...state.held.filter(h => periodOf(h) === key)].map(e => e.date)).size,
@@ -755,16 +755,16 @@ function monthLook(key) {
     : allReviewed(key) ? '꼼꼼한 리뷰러' : '차곡차곡 햄스터';
   return { face: '🐥', title };
 }
-// 월말 결산 그림: 기록이 적었던 달은 걱정하는 햄스터, 아니면 윙크하는 햄스터
-const hamsterImg = look => `<img src="img/hamster-${look.face === '🐣' ? 1 : 3}.webp" alt="">`;
+// 월말 결산 그림: 기록이 적었던 달은 새싹 햄스터(Lv.1), 아니면 웃는 햄스터(Lv.3)
+const hamsterImg = look => `<img src="img/hamster-${look.face === '🐣' ? 1 : 3}.svg" alt="">`;
 function renderStatus() {
   const key = periodOfDate(today()), prev = shiftPeriod(key, -1), m = Number(key.slice(5));
   const hasPrev = periodEntries(prev).length > 0, look = hasPrev ? monthLook(prev) : { face: '🐣', title: '새내기 기록러' };
-  const cur = monthStats(key), lv = Math.min(5, Math.floor(earnedBadges().length / 3) + 1); // 배지 3개마다 Lv.1씩, Lv.5까지 (저금통이 점점 차오름)
+  const cur = monthStats(key), lv = Math.min(6, Math.floor(earnedBadges().length / 3) + 1); // 배지 3개마다 Lv.1씩, Lv.6까지 (저금통이 점점 차오름)
   const { start } = periodRange(key), day = Math.round((parse(today()) - parse(start)) / 864e5) + 1;
   const goal = (state.settings.goals || {})[key] || '', rq = reviewQueue().length;
   $('#home-status').innerHTML = `<div class="card status">
-    <div class="st-top"><div class="st-face lv${lv}"><img class="st-art" src="img/hamster-${lv}.webp" alt="Lv.${lv} 햄스터"><span class="st-lv">Lv.${lv}</span></div>
+    <div class="st-top"><div class="st-face lv${lv}"><img class="st-art" src="img/hamster-${lv}.svg" alt="Lv.${lv} 햄스터"><span class="st-lv">Lv.${lv}</span></div>
       <div style="flex:1;min-width:0"><p class="st-title">${esc(look.title)} · ${m}월 ${day}일째</p>
         <button class="st-goal-big${goal ? '' : ' empty'}" data-goal aria-label="${m}월 다짐 ${goal ? '고치기' : '적기'}"><span class="g-lab">🎯 ${m}월 다짐</span>${goal
           ? `${esc(goal)} <span class="g-pen">✎</span>` : '<span class="g-add">＋ 이번 달 다짐 적기</span>'}</button></div></div>
